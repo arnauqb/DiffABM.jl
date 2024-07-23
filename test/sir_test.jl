@@ -1,0 +1,25 @@
+using DiffABM
+using Test
+
+@testset "test SIR" begin
+    n_agents = 100
+    venues = ["household", "company", "school", "leisure"]
+    fraction_population_per_venue = [1.0, 0.4, 0.4, 1.0]
+    number_per_venue = [1, 2, 3, 4]
+    graph = DiffABM.generate_random_world_graph(
+        n_agents, venues, fraction_population_per_venue, number_per_venue)
+    initial_infected = 0.1
+    gamma = 0.05
+    betas = [0.5, 0.2, 0.3, 0.1]
+    betas_by_venue = Dict(zip(venues, betas))
+    n_timesteps = 30
+    delta_t = 1.0
+    discrete_sampler = SM()
+    infection_type = ConstantInfection()
+    policies = Policies()
+    params = SIRParams(
+        graph, initial_infected, betas_by_venue, gamma, delta_t, n_timesteps,
+        discrete_sampler, infection_type, policies)
+    delta_I_ts = abm_run(params)
+    @test length(delta_I_ts) == n_timesteps
+end

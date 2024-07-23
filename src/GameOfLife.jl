@@ -63,7 +63,6 @@ function abm_run(params::GameOfLifeParams{T, Q, S}) where {T, Q, S}
     N = params.board_length
     board = OffsetArray(zeros(Q, 2 * N + 3, 2 * N + 3), (-(N + 1)):(N + 1),
         (-(N + 1)):(N + 1)) # pad by 1
-    println(size(board))
     for i in (-N):N
         for j in (-N):N
             board[i, j] = sample_bernoulli(params.discrete_sampler, [params.initial_prob])[1]

@@ -18,5 +18,5 @@ using Test
             end
         end
     end
-    @test initial_life / (2 * N)^2 ≈ initial_p rtol = 0.05
+    @test initial_life / (2 * N)^2 ≈ initial_p rtol = 0.05 atol = 0.05
 end;

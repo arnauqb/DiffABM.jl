@@ -2,10 +2,12 @@ module DiffABM
 
 import Distributions
 using DiffResults
+using Distributions
 using ForwardDiff
 using Flux
 using GraphNeuralNetworks
 using OffsetArrays
+using Random
 using StaticArrays
 using StochasticAD
 
@@ -17,7 +19,10 @@ abm_logpdf(params) = throw("Not implemented for $(typeof(params))")
 
 # Write your package code here.
 include("discrete_randomness.jl")
-include("SIR/sir.jl")
+
+# models
+include("BrockHommes.jl")
 include("GameOfLife.jl")
+include("SIR/sir.jl")
 
 end
