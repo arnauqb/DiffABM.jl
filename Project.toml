@@ -3,6 +3,17 @@ uuid = "f2f60c34-395c-4859-8b28-bd94254cb891"
 authors = ["Arnau Quera-Bofarull"]
 version = "1.0.0-DEV"
 
+[deps]
+DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GraphNeuralNetworks = "cffab07f-9bc2-4db1-8861-388f63bf7694"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
 [compat]
 julia = "1.6.7"
 
