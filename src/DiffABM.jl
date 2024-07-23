@@ -23,6 +23,7 @@ include("discrete_randomness.jl")
 # models
 include("BrockHommes.jl")
 include("GameOfLife.jl")
+include("RandomWalk.jl")
 include("SIR/sir.jl")
 
 end
