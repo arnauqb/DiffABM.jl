@@ -18,6 +18,7 @@ struct SIRParams{G, TI, TB, TG, S, I}
     infection_type::I
     policies::Policies
 end
+@functor SIRParams (initial_infected, venue_betas, gamma,)
 get_betas_by_venue(p::SIRParams) = Dict(zip(p.venues, p.venue_betas))
 
 struct Results{T}
@@ -35,7 +36,7 @@ function initialize(sampler, n_agents, initial_infected, T)
     I = 1.0 .- S
     R = zeros(T, n_agents)
     initial_infection_times = zeros(T, n_agents)
-    return S, I, R, sum(I), 0.0, initial_infection_times
+    return S, I, R, I, zeros(T, length(S)), initial_infection_times
 end
 
 get_edge_type_for_venue(venue) = (:agent, :attends, Symbol(venue))
@@ -114,10 +115,10 @@ function abm_run(params::SIRParams)
         eltype(params.venue_betas))
     x = initialize(
         params.discrete_sampler, params.graph.num_nodes[:agent], params.initial_infected[1], T)
-    delta_I_ts = [x[4]]
+    delta_I_ts = [sum(x[4])]
     for t in 2:(params.n_timesteps)
         x = abm_step(params, x, t)
-        delta_I_ts = vcat(delta_I_ts, [x[4]])
+        delta_I_ts = vcat(delta_I_ts, [sum(x[4])])
     end
     return delta_I_ts
 end

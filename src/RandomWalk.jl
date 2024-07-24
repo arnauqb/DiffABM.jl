@@ -5,6 +5,7 @@ struct RandomWalkParams{T, S}
     discrete_sampler::S
     p::Vector{T}
 end
+@functor RandomWalkParams (p,)
 
 function abm_step(params::RandomWalkParams{T}, x, t) where {T}
     delta_x = 2 * sample_bernoulli(params.discrete_sampler, params.p)[1] - 1

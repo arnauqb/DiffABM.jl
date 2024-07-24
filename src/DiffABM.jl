@@ -1,11 +1,14 @@
 module DiffABM
 
+using ChainRulesCore
 import Distributions
 using DiffResults
 using Distributions
 using ForwardDiff
+using Functors
 using Flux
 using GraphNeuralNetworks
+using GumbelSoftmax
 using OffsetArrays
 using Random
 using StaticArrays

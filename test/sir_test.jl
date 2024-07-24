@@ -13,12 +13,13 @@ using Test
     betas = [0.5, 0.2, 0.3, 0.1]
     n_timesteps = 30
     delta_t = 1.0
-    discrete_sampler = SM()
     infection_type = ConstantInfection()
     policies = Policies()
-    params = SIRParams(
-        graph, initial_infected, betas, venues, gamma, delta_t, n_timesteps,
-        discrete_sampler, infection_type, policies)
-    delta_I_ts = abm_run(params)
-    @test length(delta_I_ts) == n_timesteps
+    for discrete_sampler in [GS(0.1), SAD(), ST(), SM()]
+        params = SIRParams(
+            graph, initial_infected, betas, venues, gamma, delta_t, n_timesteps,
+            discrete_sampler, infection_type, policies)
+        delta_I_ts = abm_run(params)
+        @test length(delta_I_ts) == n_timesteps
+    end
 end

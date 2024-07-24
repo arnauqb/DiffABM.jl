@@ -4,6 +4,7 @@ struct BrockHommesParams{T}
     n_timesteps::Int64
     params::Vector{T}
 end
+@functor BrockHommesParams (params,)
 
 function compute_u(x, g, b, R)
     t1 = x[end] - R * x[end - 1]
