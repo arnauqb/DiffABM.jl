@@ -6,19 +6,19 @@ include("june_graph_loader.jl")
 
 export run_sir, SIRParams
 
-struct SIRParams{G, T, Q, S, I, P, L}
+struct SIRParams{G, TI, TB, TG, S, I}
     graph::G
-    initial_infected::T
-    betas_by_venue::L
-    gamma::T
-    delta_t::T
-    n_timesteps::Q
+    initial_infected::Vector{TI}
+    venue_betas::Vector{TB}
+    venues::Vector{Symbol}
+    gamma::Vector{TG}
+    delta_t::Float64
+    n_timesteps::Int64
     discrete_sampler::S
     infection_type::I
-    policies::P
+    policies::Policies
 end
-get_venues(p::SIRParams) = collect(keys(p.betas_by_venue))
-get_betas(p::SIRParams) = collect(values(p.betas_by_venue))
+get_betas_by_venue(p::SIRParams) = Dict(zip(p.venues, p.venue_betas))
 
 struct Results{T}
     S_ts::T
@@ -104,16 +104,16 @@ end
 
 function abm_step(params::SIRParams, x, t)
     x = sir_step(
-        params.graph, x[1], x[2], x[3], x[4], get_venues(params), get_betas(params),
-        params.gamma, t, params.delta_t, params.discrete_sampler, params.infection_type, params.policies)
+        params.graph, x[1], x[2], x[3], x[4], params.venues, params.venue_betas,
+        params.gamma[1], t, params.delta_t, params.discrete_sampler, params.infection_type, params.policies)
     return x
 end
 
 function abm_run(params::SIRParams)
     T = promote_type(eltype(params.initial_infected), eltype(params.gamma),
-        eltype(values(params.betas_by_venue)))
+        eltype(params.venue_betas))
     x = initialize(
-        params.discrete_sampler, params.graph.num_nodes[:agent], params.initial_infected, T)
+        params.discrete_sampler, params.graph.num_nodes[:agent], params.initial_infected[1], T)
     delta_I_ts = [x[4]]
     for t in 2:(params.n_timesteps)
         x = abm_step(params, x, t)
@@ -185,10 +185,13 @@ function SIRParams(graph, config)
     infection_type = getfield(Main, Symbol(config["infection_type"]["type"]))(config["infection_type"]["params"]...)
     sampler = getfield(Main, Symbol(config["discrete_sampler"]["type"]))(config["discrete_sampler"]["params"]...)
     betas_by_venue = Dict(Symbol(venue) => beta for (venue, beta) in config["venues"])
+    betas = collect(values(betas_by_venue))
+    venues = collect(keys(betas_by_venue))
     return SIRParams(
         graph,
         config["initial_infected"],
-        betas_by_venue,
+        betas,
+        venues,
         config["gamma"],
         config["delta_t"],
         config["n_timesteps"],
