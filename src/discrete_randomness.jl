@@ -12,7 +12,10 @@ struct RGS <: DiscreteSampler
     tau::Float64
 end
 # StochasticAD
-struct SAD <: DiscreteSampler end
+struct SAD{T} <: DiscreteSampler
+    derivative_coupling::T
+end
+SAD() = SAD(StochasticAD.InversionMethodDerivativeCoupling())
 # StochasticAD with smoothing
 struct SM <: DiscreteSampler end
 # Straight-Through

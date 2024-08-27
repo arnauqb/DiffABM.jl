@@ -7,7 +7,7 @@ include("june_graph_loader.jl")
 export run_sir, SIRParams
 
 struct SIRParams{G, TI, TB, TG, S, I}
-    graph::G
+    graph_generator::G
     initial_infected::Vector{TI}
     venue_betas::Vector{TB}
     venues::Vector{Symbol}
@@ -18,7 +18,7 @@ struct SIRParams{G, TI, TB, TG, S, I}
     infection_type::I
     policies::Policies
 end
-@functor SIRParams (initial_infected, venue_betas, gamma,)
+@functor SIRParams (initial_infected, venue_betas, gamma, graph_generator)
 get_betas_by_venue(p::SIRParams) = Dict(zip(p.venues, p.venue_betas))
 
 struct Results{T}
@@ -63,16 +63,16 @@ function compute_transmission(
     return transmission
 end
 
-function compute_transmission(
-        graph, policies, venues, betas::Vector{T}, S::Vector{T}, I::Vector{T},
-        infection_times::Vector{T}, infection_type, time, delta_t) where {T <:
-                                                                          StochasticAD.StochasticTriple}
-    return StochasticAD.propagate(
-        (betas, S, I, infection_times) -> compute_transmission(
-            graph, policies, venues, betas, S, I,
-            infection_times, infection_type, time, delta_t),
-        betas, S, I, infection_times, keep_deltas = Val(true), provided_st_rep = betas[1])
-end
+#function compute_transmission(
+#        graph, policies, venues, betas::Vector{T}, S::Vector{T}, I::Vector{T},
+#        infection_times::Vector{T}, infection_type, time, delta_t) where {T <:
+#                                                                          StochasticAD.StochasticTriple}
+#    return StochasticAD.propagate(
+#        (graph, betas, S, I, infection_times) -> compute_transmission(
+#            graph, policies, venues, betas, S, I,
+#            infection_times, infection_type, time, delta_t),
+#        graph, betas, S, I, infection_times, keep_deltas = Val(true))
+#end
 
 function compute_recovery(I, gamma, delta_t)
     recovery = I .* (1.0 - exp(-gamma * delta_t))
@@ -89,6 +89,7 @@ end
 
 function sir_step(graph, S, I, R, infection_times, venues, betas, gamma, time, delta_t,
         sampler, infection_type, policies)
+    #Main.@infiltrate
     transmission = compute_transmission(
         graph, policies, venues, betas, S, I,
         infection_times, infection_type, time, delta_t)
@@ -103,9 +104,9 @@ function sir_step(graph, S, I, R, infection_times, venues, betas, gamma, time, d
     return x
 end
 
-function abm_step(params::SIRParams, x, t)
+function abm_step(params::SIRParams, graph, x, t)
     x = sir_step(
-        params.graph, x[1], x[2], x[3], x[4], params.venues, params.venue_betas,
+        graph, x[1], x[2], x[3], x[4], params.venues, params.venue_betas,
         params.gamma[1], t, params.delta_t, params.discrete_sampler, params.infection_type, params.policies)
     return x
 end
@@ -113,11 +114,12 @@ end
 function abm_run(params::SIRParams)
     T = promote_type(eltype(params.initial_infected), eltype(params.gamma),
         eltype(params.venue_betas))
+    graph = params.graph_generator()
     x = initialize(
-        params.discrete_sampler, params.graph.num_nodes[:agent], params.initial_infected[1], T)
+        params.discrete_sampler, graph.num_nodes[:agent], params.initial_infected[1], T)
     delta_I_ts = [sum(x[4])]
     for t in 2:(params.n_timesteps)
-        x = abm_step(params, x, t)
+        x = abm_step(params, graph, x, t)
         delta_I_ts = vcat(delta_I_ts, [sum(x[4])])
     end
     return delta_I_ts

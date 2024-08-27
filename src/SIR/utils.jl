@@ -32,6 +32,7 @@ function generate_random_world_graph(
     n_venues = length(venues)
     num_nodes = Dict(:agent => n_agents)
     eindex_dict = Dict()
+    edata = Dict()
     for i in 1:n_venues
         n_agents_in_venue = Int(floor(n_agents * fraction_population_per_venue[i]))
         agents_in_venue = randperm(n_agents)[1:n_agents_in_venue]
@@ -39,9 +40,11 @@ function generate_random_world_graph(
         edges_venue = agents_in_venue, rand(1:n_people_per_venue, n_agents_in_venue)
         venue_symbol = Symbol(venues[i])
         eindex_dict[(:agent, :attends, venue_symbol)] = edges_venue
+        edata[(:agent, :attends, venue_symbol)] = ones(n_agents_in_venue)
         eindex_dict[(venue_symbol, :attends, :agent)] = (edges_venue[2], edges_venue[1])
         num_nodes[venue_symbol] = n_people_per_venue
     end
     eindex = (k => v for (k, v) in eindex_dict)
-    return GNNHeteroGraph(eindex; num_nodes)
+    edata = (k => v for (k, v) in edata)
+    return GNNHeteroGraph(eindex; num_nodes, edata)
 end
