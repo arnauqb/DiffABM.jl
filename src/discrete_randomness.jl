@@ -21,10 +21,6 @@ struct SM <: DiscreteSampler end
 # Straight-Through
 struct ST <: DiscreteSampler end
 
-ignore_gradient(x) = ChainRulesCore.ignore_derivatives(x)
-ignore_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
-ignore_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
-
 function sample_categorical(::Union{SAD, SM}, probs)
     return [rand(Distributions.Categorical(probs[:, i])) for i in 1:axes(probs, 2)]
 end

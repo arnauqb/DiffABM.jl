@@ -5,15 +5,18 @@ abstract type AbstractPolicies end
 Base.getindex(ps::AbstractPolicies, i) = ps.policies[i]
 
 struct SocialDistancing{T,U,V} <: AbstractPolicy
-    start_time::V
-    end_time::V
-    alphas_by_venue::Dict{U,T}
+    start_time::Vector{V}
+    end_time::Vector{V}
+    alphas_by_venue::Dict{U,Vector{T}}
 end
-SocialDistancing(config::Dict) = SocialDistancing(config[:start_time], config[:end_time], config[:alphas_by_venue])
+@functor SocialDistancing (start_time, end_time, alphas_by_venue)
+SocialDistancing(config::Dict) = SocialDistancing(
+    [config[:start_time]], [config[:end_time]], Dict(config[:alphas_by_venue]))
 
 struct SocialDistancingPolicies <: AbstractPolicies
     policies::Vector{SocialDistancing}
 end
+@functor SocialDistancingPolicies (policies, )
 SocialDistancingPolicies() = SocialDistancingPolicies(SocialDistancing[])
 function SocialDistancingPolicies(config::Dict)
     policies = SocialDistancing[]
@@ -25,11 +28,8 @@ end
 
 
 function (p::SocialDistancing)(x, time, venue)
-    if p.start_time <= time < p.end_time && haskey(p.alphas_by_venue, venue)
-        return x .* p.alphas_by_venue[venue]
-    else
-        return x
-    end
+    mask = differentiable_step(p.start_time[1], p.end_time[1], time)
+    return @. x * (mask * p.alphas_by_venue[venue] + (1.0 - mask))
 end
 
 function (p::SocialDistancingPolicies)(x, time, venue)
@@ -40,15 +40,17 @@ function (p::SocialDistancingPolicies)(x, time, venue)
 end
 
 struct Quarantine{T,V} <: AbstractPolicy
-    start_time::V
-    end_time::V
-    p::T
+    start_time::Vector{V}
+    end_time::Vector{V}
+    p::Vector{T}
 end
-Quarantine(config) = Quarantine(config[:start_time], config[:end_time], config[:p])
+@functor Quarantine (start_time, end_time, p)
+Quarantine(config) = Quarantine([config[:start_time]], [config[:end_time]], [config[:p]])
 
 struct QuarantinePolicies <: AbstractPolicies
     policies::Vector{Quarantine}
 end
+@functor QuarantinePolicies (policies, )
 QuarantinePolicies() = QuarantinePolicies(Quarantine[])
 function QuarantinePolicies(config::Dict)
     policies = Quarantine[]
@@ -59,12 +61,10 @@ function QuarantinePolicies(config::Dict)
 end
 
 function (p::Quarantine)(sampler, transmission, time)
-    if p.start_time <= time < p.end_time
-        quarantine_probs = ones(length(transmission)) .* p.p
-        return sampler(quarantine_probs) .* transmission
-    else
-        return transmission
-    end
+    mask = differentiable_step(p.start_time[1], p.end_time[1], time)
+    quarantine_probs = ones(length(transmission)) .* p.p[1]
+    does_quarantine = sample_bernoulli(sampler, quarantine_probs)
+    return @. transmission * (mask * does_quarantine + (1.0 - mask))
 end
 
 function (p::QuarantinePolicies)(sampler, transmission, time)
@@ -78,6 +78,7 @@ struct Policies
     social_distancing::SocialDistancingPolicies
     quarantine::QuarantinePolicies
 end
+@functor Policies (social_distancing, quarantine)
 Policies() = Policies(SocialDistancingPolicies(), QuarantinePolicies())
 function Policies(config::Dict)
     sd = SocialDistancingPolicies(config[:social_distancing])

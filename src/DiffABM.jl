@@ -11,6 +11,7 @@ using GraphNeuralNetworks
 using GumbelSoftmax
 using OffsetArrays
 using Random
+using SpecialFunctions
 using StaticArrays
 using StochasticAD
 
@@ -21,6 +22,7 @@ abm_step(params) = throw("Not implemented for $(typeof(params))")
 abm_logpdf(params) = throw("Not implemented for $(typeof(params))")
 
 # Write your package code here.
+include("diff_utils.jl")
 include("discrete_randomness.jl")
 
 # models

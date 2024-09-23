@@ -18,8 +18,10 @@ function propagate_inf(
     sg = edge_type_subgraph(graph, edge_type)
     betas = beta .* ones(T, graph.num_nodes[edge_type[3]])
     edge_weight = sg.edata[edge_type].e
+    #cumulative_trans = propagate(
+    #    _message_edge_weights, sg, +, xi = betas, xj = transmission, e = edge_weight)
     cumulative_trans = propagate(
-        _message_edge_weights, sg, +, xi = betas, xj = transmission, e = edge_weight)
+        _message, sg, +, xi = betas, xj = transmission)
     n_neighbors = max.(1.0, get_number_neighbors(sg, edge_type) .- 1.0)
     cumulative_trans = cumulative_trans ./ n_neighbors
     reverse_edge_type = (edge_type[3], edge_type[2], edge_type[1])
