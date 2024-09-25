@@ -48,6 +48,8 @@ function propagate_infection(
 		beta = policies.social_distancing(base_beta, time, venue)
 		edge_type = get_edge_type_for_venue(venue)
 		ret = ret + propagate_inf(graph, edge_type, beta, transmission)
+        # assume complete graph for now
+        #ret = ret .+ beta .* sum(transmission, dims=1) / (graph.num_nodes[:agent] - 1)
 	end
 	return ret
 end
@@ -111,6 +113,12 @@ function abm_step(params::SIRParams, graph, x, t)
 end
 
 function abm_run(params::SIRParams)
+    toprint = params.policies.quarantine[1]
+    #println("-"^20)
+    #println(StochasticAD.value(toprint.start_time[1]))
+    #println(StochasticAD.value(toprint.end_time[1]))
+    #println(StochasticAD.value(toprint.p[1]))
+    #println("-"^20)
 	T = promote_type(eltype(params.initial_infected), eltype(params.gamma),
 		eltype(params.venue_betas))
 	graph = params.graph_generator()
