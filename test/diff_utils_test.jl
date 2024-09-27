@@ -14,4 +14,5 @@ using ForwardDiff
         @test ForwardDiff.derivative(x -> DiffABM.differentiable_step(0.0, 1.0, x), 0.2) > 0.0
         @test ForwardDiff.derivative(x -> DiffABM.differentiable_step(0.0, 1.0, x), 0.8) < 0.0
     end
+
 end

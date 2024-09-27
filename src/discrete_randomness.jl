@@ -60,3 +60,8 @@ end
 function sample_bernoulli(::ST, p::AbstractVector)
     return sample_bernoulli.(Ref(ST()), p)
 end
+
+function sample_categorical_onehot(probs)
+    index = rand(Categorical(probs))
+    return onehot(index, 1:length(probs))
+end

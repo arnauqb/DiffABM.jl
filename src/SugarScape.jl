@@ -1,4 +1,6 @@
-export SugarScapeParams, TwoPeakBoard, RandomAgentInitializer, ArgmaxMovingRule, VonNeumannNeighborhood
+export SugarScapeParams, TwoPeakBoard, RandomAgentInitializer, ArgmaxMovingRule, VonNeumannNeighborhood, MooreNeighborhood
+
+using Base
 
 function is_out_of_bounds(N, i, j)
 	return i < 1 || i > N || j < 1 || j > N
@@ -24,26 +26,41 @@ end
 
 abstract type BoardInitializer end
 
+struct GeneratedBoard{T} <: BoardInitializer
+	N::Int64
+	board::Vector{T}
+end
+get_type(board::GeneratedBoard) = typeof(board.board[1])
+@functor GeneratedBoard (board,)
+
 struct TwoPeakBoard{T, Q} <: BoardInitializer
 	N::Int
-	sugar_peaks::Vector{Vector{T}}
+	sugar_peaks::Vector{T}
 	max_sugar::Vector{Q}
 	distance_function::Function
 end
-@functor TwoPeakBoard (max_sugar,)
+get_type(board::TwoPeakBoard) = promote_type(typeof(board.max_sugar[1]), typeof(board.sugar_peaks[1]))
+@functor TwoPeakBoard (sugar_peaks, max_sugar)
 
-function initialize_board(initializer, diff_type)
+function initialize_board(initializer::TwoPeakBoard, diff_type)
 	N, max_sugar = initializer.N, initializer.max_sugar
 	board = zeros(diff_type, N, N)
+	sugar_peak_xs = initializer.sugar_peaks[1:2:end]
+	sugar_peak_ys = initializer.sugar_peaks[2:2:end]
+	n_peaks = length(sugar_peak_xs)
 	for i in 1:N
 		for j in 1:N
-			for peak in initializer.sugar_peaks
-				sugar = max_sugar[1] * exp(-initializer.distance_function((i, j), peak))
+			for k in 1:n_peaks
+                dist = initializer.distance_function((i, j), (sugar_peak_xs[k], sugar_peak_ys[k])) + 1e-3
+				sugar = max_sugar[1] * exp(-dist)
 				board[i, j] += sugar
 			end
 		end
 	end
 	return board
+end
+function initialize_board(initializer::GeneratedBoard, diff_type)
+	return reshape(initializer.board, initializer.N, initializer.N)
 end
 
 abstract type AgentInitializer end
@@ -55,12 +72,14 @@ struct RandomAgentInitializer{T, Q, R, S, U} <: AgentInitializer
 	wealth_distribution::S
 	position_distribution::U
 end
-function RandomAgentInitializer(board_length)
-	vision_distribution = DiscreteUniform(1, 5)
-	metabolic_rate_distribution = Uniform(1, 4)
-	max_age_distribution = Uniform(60, 100)
-	wealth_distribution = Uniform(10, 20)
-	position_distribution = Product(DiscreteUniform.([1, 1], [board_length, board_length]))
+function RandomAgentInitializer(
+	board_length;
+	vision_distribution = DiscreteUniform(1, 5),
+	metabolic_rate_distribution = Uniform(1, 4),
+	max_age_distribution = Uniform(60, 100),
+	wealth_distribution = Uniform(10, 20),
+	position_distribution = Product(DiscreteUniform.([1, 1], [board_length, board_length])),
+)
 	return RandomAgentInitializer(
 		vision_distribution,
 		metabolic_rate_distribution,
@@ -108,63 +127,82 @@ function initialize_agents(initializer::RandomAgentInitializer{T, Q, R, S, U}, n
 end
 
 abstract type MovingRule end
+
 abstract type Neighborhood end
 
+make_vision_matrix(max_vision) = [[i >= j ? 1 : 0 for j in 1:max_vision] for i in 1:max_vision]
 struct VonNeumannNeighborhood <: Neighborhood
 	board_length::Int64
-	i::Int64
-	j::Int64
-	vision::Int64
+	max_vision::Int64
+	vision_matrix::Vector{Vector{Float64}}
 end
-VonNeumannNeighborhood(board_length, i::Float64, j::Float64, vision) = VonNeumannNeighborhood(board_length, Int64(i), Int64(j), vision)
-function VonNeumannNeighborhood(board_length, i::ForwardDiff.Dual, j::ForwardDiff.Dual, vision)
-	return VonNeumannNeighborhood(board_length, Int64(ForwardDiff.value(i)), Int64(ForwardDiff.value(j)), vision)
+function VonNeumannNeighborhood(board_length, vision)
+	vision_matrix = make_vision_matrix(vision)
+	return VonNeumannNeighborhood(board_length, vision, vision_matrix)
 end
-function Base.iterate(vnn::VonNeumannNeighborhood, state=(1, 1))
-    # state is (direction, step)
-    # with 1 = top, 2 = left, 3 = right, 4 = bottom
-    direction, step = state
-    if direction == 1
-        if step == vnn.vision
-            next_direction = direction + 1
-            next_step = 1
-        else
-            next_step = step + 1
-            next_direction = direction  
-        end
-        return wrap_index(vnn.board_length, vnn.i, vnn.j + step), (next_direction, next_step)
-    elseif direction == 2
-        if step == vnn.vision
-            next_direction = direction + 1
-            next_step = 1
-        else
-            next_step = step + 1
-            next_direction = direction
-        end
-        return wrap_index(vnn.board_length, vnn.i - step, vnn.j), (next_direction, next_step)
-    elseif direction == 3
-        if step == vnn.vision
-            next_direction = direction + 1
-            next_step = 1
-        else
-            next_step = step + 1
-            next_direction = direction
-        end
-        return wrap_index(vnn.board_length, vnn.i + step, vnn.j), (next_direction, next_step)
-    elseif direction == 4
-        if step > vnn.vision
-            return nothing # end of iteration
-        else
-            next_step = step + 1
-            next_direction = direction
-        end
-        return wrap_index(vnn.board_length, vnn.i, vnn.j - step), (next_direction, next_step)
-    end
+function iterate(vnn::VonNeumannNeighborhood, i, j, vision)
+	ret = typeof((i, j))[]
+	for direction in 1:4
+		if direction == 1
+			for k in 1:vision
+				if j + k > vnn.board_length
+					continue
+				end
+				push!(ret, (i, j + k))
+			end
+		elseif direction == 2
+			for k in 1:vision
+				if j - k < 1
+					continue
+				end
+				push!(ret, (i, j - k))
+			end
+		elseif direction == 3
+			for k in 1:vision
+				if i + k > vnn.board_length
+					continue
+				end
+				push!(ret, (i + k, j))
+			end
+		elseif direction == 4
+			for k in 1:vision
+				if i - k < 1
+					continue
+				end
+				push!(ret, (i - k, j))
+			end
+		end
+	end
+	return ret
 end
-Base.length(vnn::VonNeumannNeighborhood) = 4 * vnn.vision
+
+struct MooreNeighborhood <: Neighborhood
+	board_length::Int64
+	max_vision::Int64
+	vision_matrix::Vector{Vector{Float64}}
+end
+function MooreNeighborhood(board_length, max_vision)
+	vision_matrix = [[i >= j ? 1 : 0 for j in 1:max_vision] for i in 1:max_vision]
+	return MooreNeighborhood(board_length, max_vision, vision_matrix)
+end
+function iterate(mnn::MooreNeighborhood, i, j, vision)
+	# iterate over all cells within vision distance
+	ret = typeof((i, j))[]
+	for di in -vision:vision
+		for dj in -vision:vision
+			if di == 0 && dj == 0
+				continue  # Skip the center cell
+			end
+			row, col = i + di, j + dj
+			if 1 <= row <= mnn.board_length && 1 <= col <= mnn.board_length
+				push!(ret, (row, col))
+			end
+		end
+	end
+	return ret
+end
 
 
-struct MooreNeighborhood <: Neighborhood end
 """
 ArgmaxMovingRule: move to the cell with the maximum sugar
 """
@@ -172,21 +210,28 @@ struct ArgmaxMovingRule{T} <: MovingRule
 	neighborhood::T
 end
 
-function compute_move(board, agent, rule::ArgmaxMovingRule)
+function compute_move(board, agent, rule::ArgmaxMovingRule, occupied)
 	scores = eltype(board)[]
-	for position in rule.neighborhood(size(board, 1), agent.x[1], agent.y[1], agent.vision[1])
-		push!(scores, board[Int64(position[1]), Int64(position[2])])
-	end
+	#for (position, vision_mask) in iterate(rule.neighborhood, agent.x[1], agent.y[1], agent.vision[1])
+	for position in iterate(rule.neighborhood, agent.x[1], agent.y[1], agent.vision[1])
+		#push!(scores, board[Int64(position[1]), Int64(position[2])] * vision_mask)
+        sugar = board[Int64(round(position[1])), Int64(round(position[2]))]
+        score = sugar #* (1.0 - occupied[Int64(round(position[1])), Int64(round(position[2]))])
+		push!(scores, score)
+    end
 	move_onehot = differentiable_argmax(scores)
 	return move_onehot
 end
 
-function move!(board, agent, move_onehot, rule::ArgmaxMovingRule)
+function move!(board, agent, move_onehot, rule::ArgmaxMovingRule, occupied)
 	new_x = zero(eltype(board))
 	new_y = zero(eltype(board))
-	for (i, position) in enumerate(rule.neighborhood(size(board, 1), agent.x[1], agent.y[1], agent.vision[1]))
+	#for (i, (position, _)) in enumerate(iterate(rule.neighborhood, agent.x[1], agent.y[1], agent.vision[1]))
+    #occupied[Int64(round(agent.x[1])), Int64(round(agent.y[1]))] -= agent.alive[1]
+	for (i, position) in enumerate(iterate(rule.neighborhood, agent.x[1], agent.y[1], agent.vision[1]))
 		new_x += position[1] * move_onehot[i]
 		new_y += position[2] * move_onehot[i]
+        #occupied[Int64(round(position[1])), Int64(round(position[2]))] += move_onehot[i] * agent.alive[1]
 	end
 	agent.x[1] = agent.x[1] + agent.alive[1] * (new_x - agent.x[1])
 	agent.y[1] = agent.y[1] + agent.alive[1] * (new_y - agent.y[1])
@@ -194,18 +239,20 @@ end
 
 function consume!(board, agent, neighbourhood, move_onehot)
 	new_wealth = agent.wealth[1]
-	for (i, position) in enumerate(neighbourhood(size(board, 1), agent.x[1], agent.y[1], agent.vision[1]))
-		new_wealth += board[Int64(position[1]), Int64(position[2])] * move_onehot[i]
-		board[Int64(position[1]), Int64(position[2])] = board[Int64(position[1]), Int64(position[2])] * (1.0 - move_onehot[i])
+	#for (i, (position, _)) in enumerate(iterate(neighbourhood, agent.x[1], agent.y[1], agent.vision[1]))
+	for (i, position) in enumerate(iterate(neighbourhood, agent.x[1], agent.y[1], agent.vision[1]))
+		new_wealth += board[Int64(round(position[1])), Int64(round(position[2]))] * move_onehot[i] * agent.alive[1]
+		board[Int64(round(position[1])), Int64(round(position[2]))] = board[Int64(round(position[1])), Int64(round(position[2]))] * (1.0 - move_onehot[i] * agent.alive[1])
 	end
 	agent.wealth[1] = max(zero(eltype(board)), agent.wealth[1] + agent.alive[1] * (new_wealth - agent.wealth[1]) - agent.metabolic_rate[1])
 end
 
-function check_death!(agent)
+function check_death!(agent, occupied)
 	no_wealth = differentiable_is_less(SigmoidSmoothing(1.0), agent.wealth[1], 0.0)
 	#old = differentiable_is_greater(SigmoidSmoothing(1.0), agent.age[1], agent.max_age)
 	#is_dead = differentiable_or(no_wealth, old)
 	agent.alive[1] = agent.alive[1] * differentiable_not(no_wealth)
+    #occupied[Int64(round(agent.x[1])), Int64(round(agent.y[1]))] = agent.alive[1]
 end
 
 function age!(agent)
@@ -216,20 +263,20 @@ function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 	for i in axes(board, 1)
 		for j in axes(board, 2)
 			#board[i, j] = min(board[i, j] + sugar_regeneration_rate[1], max_sugar_capacities[i, j])
-			board[i, j] = sugar_regeneration_rate[1]
+			board[i, j] += sugar_regeneration_rate[1] * max_sugar_capacities[i, j]
 		end
 	end
 end
 
-function abm_step!(board, agents, moving_rule::ArgmaxMovingRule, sugar_regeneration_rate, max_sugar_capacities)
+function abm_step!(board, agents, occupied, moving_rule::ArgmaxMovingRule, sugar_regeneration_rate, max_sugar_capacities)
 	order = sample(1:length(agents), length(agents), replace = false)
 	for idx in order
 		agent = agents[idx]
-		move_onehot = compute_move(board, agent, moving_rule)
+		move_onehot = compute_move(board, agent, moving_rule, occupied)
 		consume!(board, agent, moving_rule.neighborhood, move_onehot)
-		age!(agent)
-		check_death!(agent)
-		move!(board, agent, move_onehot, moving_rule)
+		#age!(agent)
+		#check_death!(agent, occupied)
+		move!(board, agent, move_onehot, moving_rule, occupied)
 	end
 	regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 end
@@ -246,16 +293,20 @@ end
 @functor SugarScapeParams (board_initializer, agent_initializer, sugar_regeneration_rate)
 
 function abm_run(params::SugarScapeParams)
-	diff_type = typeof(promote(params.board_initializer.max_sugar[1], params.sugar_regeneration_rate[1])[1])
+	diff_type = get_type(params.board_initializer)
 	board = initialize_board(params.board_initializer, diff_type)
 	agents = initialize_agents(params.agent_initializer, params.n_agents, diff_type)
+    occupied = zeros(diff_type, params.board_length, params.board_length)
+    for agent in agents
+        occupied[Int64(round(agent.x[1])), Int64(round(agent.y[1]))] = 1.0
+    end
 	board_history = [copy(board)]
 	x_history = [[agent.x[1] for agent in agents]]
 	y_history = [[agent.y[1] for agent in agents]]
 	alive_history = [[agent.alive[1] for agent in agents]]
 	max_sugar_capacities = copy(board)
 	for t in 1:params.n_timesteps
-		abm_step!(board, agents, params.moving_rule, params.sugar_regeneration_rate, max_sugar_capacities)
+		abm_step!(board, agents, occupied, params.moving_rule, params.sugar_regeneration_rate, max_sugar_capacities)
 		push!(board_history, copy(board))
 		push!(x_history, [agent.x[1] for agent in agents])
 		push!(y_history, [agent.y[1] for agent in agents])
