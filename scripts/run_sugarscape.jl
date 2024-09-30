@@ -15,19 +15,19 @@ sugar_regeneration_rate = [0.1]
 distance = (x, y) -> sqrt((x[1] - y[1])^2 + (x[2] - y[2])^2) / 5
 board_initializer = TwoPeakBoard(board_length, peak_positions, [max_sugar], distance)
 agent_initializer = RandomAgentInitializer(board_length)
-moving_rule = ArgmaxMovingRule(VonNeumannNeighborhood(board_length, 10))
+moving_rule = ArgmaxMovingRule(VonNeumannNeighborhood(board_length, 3))
 sugarscape = SugarScapeParams(board_initializer, agent_initializer, moving_rule, board_length, n_agents, n_timesteps, sugar_regeneration_rate);
 
 ##
-board_history, x_history, y_history, alive_history = abm_run(sugarscape);
+board_history, x_history, y_history, alive_history, occupied_history = abm_run(sugarscape);
 
-p = plot()
+p = Plots.plot()
 alive_ts = [sum(alive_history[i]) for i in 1:n_timesteps]
 plot!(alive_ts)
 
 ##
 function plot_board(board, x, y, alive)
-    p = plot()
+    p = Plots.plot()
     board_x = collect(1:size(board)[1])
     board_y = collect(1:size(board)[2])
     heatmap!(p, board_x, board_y, board', clim = (0, max_sugar))
@@ -45,21 +45,16 @@ anim = @animate for i in 1:n_timesteps
 end
 gif(anim, "sugarscape.gif", fps=10)
 
-## differentiabiliy
-using ForwardDiff
-function diff_test(max_sugar)
-    board_length = 50
-    n_agents = 50
-    n_timesteps = 100
-    peak_positions = [[15, 15], [35, 35]]
-    board_initializer = TwoPeakBoard(board_length, peak_positions, [max_sugar], distance)
-    agent_initializer = RandomAgentInitializer(board_length)
-    moving_rule = ArgmaxMovingRule(VonNeumannNeighborhood)
-    sugarscape = SugarScapeParams(board_initializer, agent_initializer, moving_rule, board_length, n_agents, n_timesteps)
-    board_history, _, _, alive_history = abm_run(sugarscape);
-    return [sum(alive_history[i]) for i in 1:n_timesteps]
+##
+function plot_occupied(occupied)
+    p = plot()
+    board_x = collect(1:size(occupied)[1])
+    board_y = collect(1:size(occupied)[2])
+    heatmap!(p, board_x, board_y, occupied', clim = (0, 1))
+    p
 end
 
-ForwardDiff.derivative(diff_test, 80.0)
-
-##
+anim = @animate for i in 1:n_timesteps
+    plot_occupied(occupied_history[i])
+end
+gif(anim, "occupied.gif", fps=10)

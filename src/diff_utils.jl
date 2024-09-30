@@ -1,4 +1,4 @@
-export SigmoidSmoothing, GaussianSmoothing
+export SigmoidSmoothing, GaussianSmoothing, PiecewiseSmoothing, StraightThroughSmoothing
 ignore_gradient(x) = ChainRulesCore.ignore_derivatives(x)
 ignore_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
 ignore_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
@@ -20,21 +20,33 @@ function (smoothing::SigmoidSmoothing)(x)
 	return sigmoid(smoothing.k * x)
 end
 
-## Differentiable step
-function soft_step(smoothing::StepSmoothing, a, x)
-    return smoothing(x - a)
+struct StraightThroughSmoothing <: StepSmoothing end
+function (smoothing::StraightThroughSmoothing)(x)
+	return x
 end
 
-function differentiable_step(smoothing::StepSmoothing, a, x::Real)
-    soft = soft_step(smoothing, a, x)
-    hard = (x >= a)
+struct PiecewiseSmoothing <: StepSmoothing
+    thresholds::Vector{Float64}
+end
+function (smoothing::PiecewiseSmoothing)(x)
+    return clamp(x, smoothing.thresholds[1], smoothing.thresholds[2])
+end
+
+## Differentiable step
+function soft_step(smoothing::StepSmoothing, threshold, x)
+    return smoothing(x - threshold)
+end
+
+function differentiable_step(smoothing::StepSmoothing, threshold, x::Real)
+    soft = soft_step(smoothing, threshold, x)
+    hard = (x > threshold)
     return hard + (soft - ignore_gradient(soft))
 end
 
 
 ## Differentiable gate
 function hard_gate(a, b, x)
-	return x >= a && x <= b ? 1.0 : 0.0
+	return x > a && x < b ? 1.0 : 0.0
 end
 
 function soft_gate(smoothing::StepSmoothing, a, b, x)
@@ -46,23 +58,28 @@ function differentiable_gate(smoothing::StepSmoothing, a, b, x::Real)
 	return hard_gate(a, b, x) + (soft - ignore_gradient(soft))
 end
 
+function my_softmax(array)
+    return exp.(array) ./ sum(exp.(array))
+end
+
 ## Differentiable argmax
 function differentiable_argmax(array::AbstractArray{T}) where T <: Real
-    soft = softmax(array)
-    hard = argmax(array)
+    soft = my_softmax(array)
+    hard = argmax(StochasticAD.value.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
 end
 
 ## Differentiable is less and is greater
 
-function differentiable_is_less(smoothing::StepSmoothing, x, y)
-    return differentiable_step(smoothing, x, y)
-end
-
 function differentiable_is_greater(smoothing::StepSmoothing, x, y)
     return differentiable_step(smoothing, y, x)
 end
+
+function differentiable_is_less(smoothing::StepSmoothing, x, y)
+    return 1.0 - differentiable_is_greater(smoothing, x, y)
+end
+
 
 ## logic
 function differentiable_and(x, y)
