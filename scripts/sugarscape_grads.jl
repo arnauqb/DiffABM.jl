@@ -91,7 +91,7 @@ function make_model(params; gradient_horizon)
     return sugarscape
 end
 function run_model(params; gradient_horizon)
-    Random.seed!(1234)
+    #Random.seed!(1234)
     model = make_model(params, gradient_horizon = gradient_horizon)
     board_history, x_history, y_history, wealth_history, alive_history, occupied_history = abm_run(model)
     #return [sum(wealth_history[i]) for i in 1:(model.n_timesteps)]

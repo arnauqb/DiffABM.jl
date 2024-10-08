@@ -22,11 +22,11 @@ struct SM <: DiscreteSampler end
 struct ST <: DiscreteSampler end
 
 function sample_categorical(::Union{SAD, SM}, probs)
-    return [rand(Distributions.Categorical(probs[:, i])) for i in 1:axes(probs, 2)]
+    return [rand(Distributions.Categorical(probs[:, i])) for i in axes(probs, 2)]
 end
 
 function sample_categorical(::ST, probs)
-    res = [rand(Distributions.Categorical(probs[:, i])) for i in 1:axes(probs, 2)]
+    res = [rand(Distributions.Categorical(probs[:, i])) for i in axes(probs, 2)]
     return ignore_gradient(res) + (probs - ignore_gradient(probs))
 end
 

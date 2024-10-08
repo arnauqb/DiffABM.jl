@@ -3,6 +3,9 @@ ignore_gradient(x) = ChainRulesCore.ignore_derivatives(x)
 ignore_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
 ignore_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
 
+function my_sigmoid(x)
+    return 1.0 / (1.0 + exp(-x))
+end
 
 abstract type StepSmoothing end
 
@@ -29,7 +32,13 @@ struct PiecewiseSmoothing <: StepSmoothing
     thresholds::Vector{Float64}
 end
 function (smoothing::PiecewiseSmoothing)(x)
-    return clamp(x, smoothing.thresholds[1], smoothing.thresholds[2])
+    if ignore_gradient(x) < smoothing.thresholds[1]
+        return 0.0
+    elseif ignore_gradient(x) > smoothing.thresholds[2]
+        return 1.0
+    else
+        return (x - smoothing.thresholds[1]) / (smoothing.thresholds[2] - smoothing.thresholds[1])
+    end
 end
 
 ## Differentiable step
@@ -63,9 +72,14 @@ function my_softmax(array)
 end
 
 ## Differentiable argmax
-function differentiable_argmax(array::AbstractArray{T}) where T <: Real
-    soft = my_softmax(array)
-    hard = argmax(StochasticAD.value.(array))
+function random_argmax(array)
+    max_value = maximum(array)
+    max_indices = findall(x -> x == max_value, array)
+    return rand(max_indices)
+end
+function differentiable_argmax(array)
+    soft = my_softmax(array .+ 1.0) # add 1.0 to avoid overflow
+    hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
 end
