@@ -1,4 +1,4 @@
-export SigmoidSmoothing, GaussianSmoothing, PiecewiseSmoothing, StraightThroughSmoothing
+export SigmoidSmoothing, GaussianSmoothing, PiecewiseSmoothing, StraightThroughSmoothing, TwoPiecewiseSmoothing
 ignore_gradient(x) = ChainRulesCore.ignore_derivatives(x)
 ignore_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
 ignore_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
@@ -20,7 +20,7 @@ struct SigmoidSmoothing{T} <: StepSmoothing
 	k::T
 end
 function (smoothing::SigmoidSmoothing)(x)
-	return sigmoid(smoothing.k * x)
+	return 1.0 / (1.0 + exp(-smoothing.k * x))
 end
 
 struct StraightThroughSmoothing <: StepSmoothing end
@@ -41,6 +41,29 @@ function (smoothing::PiecewiseSmoothing)(x)
     end
 end
 
+struct TwoPiecewiseSmoothing <: StepSmoothing
+    xs::Vector{Float64}
+    y::Float64
+end
+function (smoothing::TwoPiecewiseSmoothing)(x)
+    a, b = smoothing.xs
+    y = smoothing.y
+    if ignore_gradient(x) < -a
+        return 0.0
+    elseif ignore_gradient(x) < -b
+        return y * (x + a) / (a - b)
+    elseif ignore_gradient(x) < b
+        m = (1-2y) / (2b)
+        n = 0.5
+        return m * x + n
+    elseif ignore_gradient(x) < a
+        m = -y / (b-a)
+        n = (1 - y) - (b * m)
+        return m * x + n
+    else
+        return 1.0
+    end
+end
 ## Differentiable step
 function soft_step(smoothing::StepSmoothing, threshold, x)
     return smoothing(x - threshold)

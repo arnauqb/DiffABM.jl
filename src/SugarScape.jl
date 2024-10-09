@@ -168,9 +168,8 @@ function initialize_agents(initializer::RandomAgentInitializer{T, Q, R, S, U},
     metabolic_rate_probs = reshape(metabolic_rate_probs, :, 1)
 	for i in 1:n_agents
 		#vision = vision_bounds[1] + rand() * (vision_bounds[2] - vision_bounds[1])
-        #vision = 3 * sample_categorical(SAD(), vision_probs)[1]
-        vision = 2 * sample_categorical(SAD(), vision_probs)[1] - 1.0
-		metabolic_rate = 4 *  sample_categorical(SAD(), metabolic_rate_probs)[1] - 3
+        vision = 1.0 * sample_categorical(SAD(), vision_probs)[1]
+		metabolic_rate = 2 + sample_categorical(SAD(), metabolic_rate_probs)[1]
 		max_age = rand(initializer.max_age_distribution)
 		wealth = convert(diff_type, rand(initializer.wealth_distribution))
 		position = convert.(diff_type, rand(initializer.position_distribution))
@@ -264,9 +263,13 @@ function iterate(vnn::VonNeumannNeighborhood, i, j, vision::T) where T
             row, col = wrap_index(vnn.board_length, i + di, j + dj)
             distance = sqrt(di^2 + dj^2)
             has_vision_hard = ignore_gradient(distance) <= ignore_gradient(vision)
-            #has_vision_soft = GaussianSmoothing(0.1)(vision - distance)
-            has_vision_soft = PiecewiseSmoothing([-0.5, 0.5])(vision - distance)
+            #has_vision_soft = GaussianSmoothing(0.001)(vision - distance)
+			#has_vision_soft = SigmoidSmoothing(100.0)(vision - distance)
+			has_vision_soft = GaussianSmoothing(0.01)(vision - distance)
+			#has_vision_soft = TwoPiecewiseSmoothing([5.0, 0.1], 0.3)(vision - distance)
+            #has_vision_soft = PiecewiseSmoothing([-0.5, 0.5])(vision - distance)
             has_vision = has_vision_hard + (has_vision_soft - ignore_gradient(has_vision_soft))
+			topush = (row, col), has_vision
             push!(ret, ((row, col), has_vision))
 		end
 	end
@@ -355,16 +358,17 @@ function check_death!(agent, occupied, average_wealth)
 	#soft = max(0.0, 1.0 - agent.wealth[1])
 	#if agent.wealth[1] > 10.0
 	#soft = 0.0
-	#else
-	#soft = 1.0 - GaussianSmoothing(0.1)(agent.wealth[1] / average_wealth)
-    soft = 1.0 - PiecewiseSmoothing([-0.5, 0.5])(agent.wealth[1] / average_wealth)
-	#soft = 1.0 - SigmoidSmoothing(average_wealth)(agent.wealth[1])
-	#soft = clamp(soft, 1e-8, 1.0)
+	#soft = GaussianSmoothing(1.0 / ignore_gradient(agent.metabolic_rate[1]))(agent.wealth[1])
+	#soft = GaussianSmoothing(0.1)(agent.wealth[1])
+	#soft = SigmoidSmoothing(100.0)(agent.wealth[1])
+	soft = GaussianSmoothing(0.01)(agent.wealth[1])
+	#soft = TwoPiecewiseSmoothing([10.0, ignore_gradient(agent.metabolic_rate[1])], 0.2)(agent.wealth[1])
+	#soft = TwoPiecewiseSmoothing([5.0, 0.1], 0.2)(agent.wealth[1])
 	#println(soft)
 	#end
-	hard = ignore_gradient(agent.wealth[1]) <= 0.0
-	dies = hard + (soft - ignore_gradient(soft))
-	agent.alive[1] = agent.alive[1] * (1.0 - dies)
+	hard = ignore_gradient(agent.wealth[1]) >= 0.0
+	lives = hard + (soft - ignore_gradient(soft))
+	agent.alive[1] = agent.alive[1] * lives
 	occupied[agent.x[1], agent.y[1]] = agent.alive[1]
 end
 
@@ -380,6 +384,9 @@ function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 			    #board#[i, j] += 10.0 #max_sugar_capacities[i, j] #min(board[i, j] + 1.0, max_sugar_capacities[i, j])
             #end
             board[i, j] = min(board[i, j] + 1.0, max_sugar_capacities[i, j])
+			if rand() < 0.01
+				board[i, j] += 10.0
+			end
 		end
 	end
 end
