@@ -113,50 +113,21 @@ function abm_step(params::SIRParams, graph, x, t)
 end
 
 function abm_run(params::SIRParams)
-    toprint = params.policies.quarantine[1]
-    #println("-"^20)
-    #println(StochasticAD.value(toprint.start_time[1]))
-    #println(StochasticAD.value(toprint.end_time[1]))
-    #println(StochasticAD.value(toprint.p[1]))
-    #println("-"^20)
 	T = promote_type(eltype(params.initial_infected), eltype(params.gamma),
 		eltype(params.venue_betas))
 	graph = params.graph_generator()
+    n_agents = graph.num_nodes[:agent]
 	x = initialize(
-		params.discrete_sampler, graph.num_nodes[:agent], params.initial_infected[1], T)
+		params.discrete_sampler, n_agents, params.initial_infected[1], T)
 	delta_I_ts = [sum(x[4])]
+    delta_R_ts = [sum(x[5])]
 	for t in 2:(params.n_timesteps)
 		x = abm_step(params, graph, x, t)
 		delta_I_ts = vcat(delta_I_ts, [sum(x[4])])
+        delta_R_ts = vcat(delta_R_ts, [sum(x[5])])
 	end
-	return delta_I_ts
+	return hcat(delta_I_ts, delta_R_ts)' ./ n_agents
 end
-
-#function run_sir(graph, initial_infected, betas_by_venue, gamma, delta_t,
-#    n_timesteps, sampler, infection_type, policies)
-#    T = promote_type(eltype(initial_infected), eltype(gamma), eltype(values(betas_by_venue)))
-#    n_agents = graph.num_nodes[:agent]
-#    venues = collect(keys(betas_by_venue))
-#    betas = collect(values(betas_by_venue))
-#    S, I, R, transmission, delta_I, delta_R, infection_times = initialize(
-#        sampler, n_agents, initial_infected, T)
-#    results = Results(T[sum(S)/n_agents], T[sum(I)/n_agents], T[sum(R)/n_agents],
-#        T[sum(I)/n_agents], T[zero(I[1])/n_agents])
-#    time = 0.0
-#    for _ in 2:n_timesteps
-#        step!(
-#            graph, S, I, R, transmission, delta_I, delta_R, infection_times, venues, betas, gamma,
-#            time, delta_t, sampler, infection_type, policies)
-#        # save results
-#        push!(results.S_ts, sum(S) / n_agents)
-#        push!(results.I_ts, sum(I) / n_agents)
-#        push!(results.R_ts, sum(R) / n_agents)
-#        push!(results.delta_I_ts, sum(delta_I) / n_agents)
-#        push!(results.delta_R_ts, sum(delta_R) / n_agents)
-#        time += delta_t
-#    end
-#    return results
-#end
 
 function read_policies(config)
 	if "policies" ∉ keys(config)

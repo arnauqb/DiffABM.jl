@@ -7,11 +7,12 @@ Base.getindex(ps::AbstractPolicies, i) = ps.policies[i]
 struct SocialDistancing{T, U, V} <: AbstractPolicy
 	start_time::Vector{V}
 	end_time::Vector{V}
-	alphas_by_venue::Dict{U, Vector{T}}
+    venues::Vector{U}
+	alphas_by_venue::Vector{T}
 end
 @functor SocialDistancing (start_time, end_time, alphas_by_venue)
 SocialDistancing(config::Dict) = SocialDistancing(
-	[config[:start_time]], [config[:end_time]], Dict(config[:alphas_by_venue]))
+	[config[:start_time]], [config[:end_time]], keys(config[:alphas_by_venue]), values(config[:alphas_by_venue]))
 
 struct SocialDistancingPolicies <: AbstractPolicies
 	policies::Vector{SocialDistancing}
@@ -28,8 +29,13 @@ end
 
 
 function (p::SocialDistancing)(x, time, venue)
-	mask = differentiable_gate(SigmoidSmoothing(1.0), p.start_time[1], p.end_time[1], time)
-	return @. x * (mask * p.alphas_by_venue[venue] + (1.0 - mask))
+	mask = differentiable_gate(GaussianSmoothing(1.0), p.start_time[1], p.end_time[1], time)
+    # search venue in p.venues if there is no match return 1.0
+    venue_index = findfirst(==(venue), p.venues)
+    if venue_index === nothing
+        return x
+    end
+	return @. x * (mask * p.alphas_by_venue[venue_index] + (1.0 - mask))
 end
 
 function (p::SocialDistancingPolicies)(x, time, venue)
@@ -61,7 +67,7 @@ function QuarantinePolicies(config::Dict)
 end
 
 function (p::Quarantine)(sampler, transmission, time)
-	mask = differentiable_gate(SigmoidSmoothing(1.0), p.start_time[1], p.end_time[1], time)
+	mask = differentiable_gate(GaussianSmoothing(1.0), p.start_time[1], p.end_time[1], time)
 	quarantine_probs = ones(length(transmission)) .* p.p[1]
 	#does_quarantine = sample_bernoulli(sampler, quarantine_probs)
 	#return @. transmission * (mask * does_quarantine + (1.0 - mask))
