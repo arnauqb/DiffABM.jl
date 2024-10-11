@@ -4,14 +4,17 @@ using ChainRulesCore
 import Distributions
 using DiffResults
 using Distributions
+using DataStructures
 using ForwardDiff
 using Functors
 using Flux
 using GraphNeuralNetworks
 using GumbelSoftmax
+using LinearAlgebra
 using OffsetArrays
 using Random
 using SpecialFunctions
+using StatsBase
 using StaticArrays
 using StochasticAD
 
@@ -31,5 +34,6 @@ include("GameOfLife.jl")
 include("RandomWalk.jl")
 include("SIR/sir.jl")
 include("SugarScape.jl")
+include("AxtellFirms.jl")
 
 end

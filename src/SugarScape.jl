@@ -8,40 +8,6 @@ function is_out_of_bounds(N, i, j)
     return i < 1 || i > N || j < 1 || j > N
 end
 
-Base.isinteger(x::Real, tol::Float64) = abs(round(x) - x) < tol
-
-function Base.getindex(board::AbstractArray, i::T,
-        j::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    j = StochasticAD.value(j)
-    #@assert isinteger(i, 1e-6)
-    #@assert isinteger(j, 1e-6)
-    return board[Int64(round(i)), Int64(round(j))]
-end
-function Base.setindex!(board::AbstractArray, v, i::T,
-        j::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    j = StochasticAD.value(j)
-    #@assert isinteger(i, 1e-6)
-    #@assert isinteger(j, 1e-6)
-    return board[Int64(round(i)), Int64(round(j))] = v
-end
-
-function wrap_index(N, i, j)
-    # given board length N, and index i, j
-    # return the wrapped index to make the board toroidal
-    return mod(i - 1, N) + 1, mod(j - 1, N) + 1
-end
-
-function check_delta_s(x)
-    if typeof(x) <: StochasticAD.StochasticTriple
-        if isnan(StochasticAD.get_Δs(x, StochasticAD.PrunedFIsBackend()).Δ)
-            return true
-        end
-    end
-    return false
-end
-
 struct SugarSeeker{T, V, M}
     id::Int64
     age::Vector{T}
