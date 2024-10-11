@@ -17,7 +17,7 @@ function propagate_inf(
         graph, edge_type, beta::T, transmission::AbstractVector{Q}) where {T, Q}
     sg = edge_type_subgraph(graph, edge_type)
     betas = beta .* ones(T, graph.num_nodes[edge_type[3]])
-    edge_weight = sg.edata[edge_type].e
+    #edge_weight = sg.edata[edge_type].e
     #cumulative_trans = propagate(
     #    _message_edge_weights, sg, +, xi = betas, xj = transmission, e = edge_weight)
     cumulative_trans = propagate(

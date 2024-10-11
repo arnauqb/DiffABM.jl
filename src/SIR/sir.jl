@@ -48,8 +48,6 @@ function propagate_infection(
 		beta = policies.social_distancing(base_beta, time, venue)
 		edge_type = get_edge_type_for_venue(venue)
 		ret = ret + propagate_inf(graph, edge_type, beta, transmission)
-        # assume complete graph for now
-        #ret = ret .+ beta .* sum(transmission, dims=1) / (graph.num_nodes[:agent] - 1)
 	end
 	return ret
 end
