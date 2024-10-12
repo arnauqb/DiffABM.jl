@@ -30,14 +30,14 @@ function compute_group_effort_from_output(output, effort, a, b)
 end
 
 function compute_optimal_effort(theta_i, omega_i, E_tilde_i, a, b)
-    numerator = -a -2b*(E_tilde_i - theta_i)
-    numerator += sqrt(a^2 + 4*a*b*theta_i^2*(1+E_tilde_i) + 4*b^2*theta_i^2*(1+E_tilde_i)^2)
+    numerator = -a - 2b * (E_tilde_i - theta_i)
+    numerator += sqrt(a^2 + 4 * a * b * theta_i^2 * (1 + E_tilde_i) + 4 * b^2 * theta_i^2 * (1 + E_tilde_i)^2)
     denominator = 2b * (1 + theta_i)
     return max(numerator / denominator, zero(typeof(numerator)))
 end
 
 function compute_utility(
-        firms_output, firms_size, theta_agent, endowment_agent, effort_agent)
+    firms_output, firms_size, theta_agent, endowment_agent, effort_agent)
     if ignore_gradient(firms_output) == 0.0
         return 0.0
     end
@@ -77,9 +77,9 @@ end
 
 struct RandomAxtellAgentInitializer{T} <: AbstractAxtellAgentInitializer
     n_agents::Int64
-    thetas_bounds::Tuple{T, T}
-    endowments_bounds::Tuple{T, T}
-    initial_efforts_bounds::Tuple{T, T}
+    thetas_bounds::Tuple{T,T}
+    endowments_bounds::Tuple{T,T}
+    initial_efforts_bounds::Tuple{T,T}
     neighbours::Vector{Vector{Int64}}
 end
 get_type(initializer::RandomAxtellAgentInitializer{T}) where {T} = T
@@ -88,11 +88,11 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
     firms = Vector{Firm{diff_type}}()
     for i in 1:(initializer.n_agents)
         theta = convert(diff_type, initializer.thetas_bounds[1] +
-                (initializer.thetas_bounds[2] - initializer.thetas_bounds[1]) * rand())
+                                   (initializer.thetas_bounds[2] - initializer.thetas_bounds[1]) * rand())
         endowment = convert(diff_type, 1.0)
         effort = initializer.initial_efforts_bounds[1] +
-                  (initializer.initial_efforts_bounds[2] -
-                   initializer.initial_efforts_bounds[1]) * rand()
+                 (initializer.initial_efforts_bounds[2] -
+                  initializer.initial_efforts_bounds[1]) * rand()
         effort = [convert(diff_type, effort)]
         neighbors = initializer.neighbours[i]
         agent = Agent(i, theta, endowment, effort, [convert(diff_type, i)], neighbors)
@@ -103,7 +103,7 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
 end
 
 function compute_agent_utilities(
-        agents, agent::Agent{T}, firms::Vector{Firm{T}}, a::T, b::T) where {T}
+    agents, agent::Agent{T}, firms::Vector{Firm{T}}, a::T, b::T) where {T}
     utilities = T[]
     firm_candidates_ids = T[]
     optimal_efforts = T[]
@@ -199,8 +199,20 @@ struct AxtellFirmsParams{T}
     delta_t::Float64
     n_steps::Int64
     soft_histogram_sigma::Float64
+    gradient_horizon::Int64
 end
 @functor AxtellFirmsParams (agent_initializer, a, b)
+
+function reconstruct_firms_agents_no_gradient(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}) where {T}
+    firms = [Firm(firm.id, convert.(T, ignore_gradient.(firm.output)), convert.(T, ignore_gradient.(firm.size))) for firm in firms]
+    agents = [Agent(agent.id,
+                    convert.(T, ignore_gradient(agent.theta)),
+                    convert.(T, ignore_gradient(agent.endowment)),
+                    convert.(T, ignore_gradient.(agent.effort)),
+                    convert.(T, ignore_gradient.(agent.firm_id)),
+                    agent.neighbors) for agent in agents]
+    return firms, agents
+end
 
 function abm_run(params::AxtellFirmsParams)
     diff_type = promote_type(
@@ -211,10 +223,13 @@ function abm_run(params::AxtellFirmsParams)
     mean_firm_output_by_timestep = [mean([firm.output[1] for firm in firms])]
     mean_firm_size_by_timestep = [mean([firm.size[1] for firm in firms if firm.size[1] > 0])]
     for t in 2:(params.n_steps)
+        if t % params.gradient_horizon == 0
+            firms, agents = reconstruct_firms_agents_no_gradient(firms, agents)
+        end
         step!(agents, firms, params.a[1], params.b[1], params.activation_rate, params.delta_t)
         push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in firms]))
         push!(mean_firm_size_by_timestep, mean([firm.size[1] for firm in firms if firm.size[1] > 0]))
     end
-    return hcat(mean_effort_by_timestep, mean_firm_output_by_timestep, mean_firm_size_by_timestep)'
+    return hcat(mean_effort_by_timestep, mean_firm_size_by_timestep)'
 end
