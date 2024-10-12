@@ -25,7 +25,7 @@ function compute_group_effort_from_output(output, effort, a, b)
     B = a + 2b * effort
     C = a * effort + b * effort^2 - output
     # solve the quadratic equation since A>0 take the positive root
-    x = (-B + sqrt(B^2 - 4A * C)) / (2A)
+    x = (-B + sqrt(B^2 - 4A * C + 1e-8)) / (2A) # add a small number to avoid NaNs
     return x
 end
 
@@ -209,10 +209,12 @@ function abm_run(params::AxtellFirmsParams)
     update_firm_outputs!(firms, agents, params.a[1], params.b[1])
     mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
     mean_firm_output_by_timestep = [mean([firm.output[1] for firm in firms])]
+    mean_firm_size_by_timestep = [mean([firm.size[1] for firm in firms if firm.size[1] > 0])]
     for t in 2:(params.n_steps)
         step!(agents, firms, params.a[1], params.b[1], params.activation_rate, params.delta_t)
         push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in firms]))
+        push!(mean_firm_size_by_timestep, mean([firm.size[1] for firm in firms if firm.size[1] > 0]))
     end
-    return hcat(mean_effort_by_timestep, mean_firm_output_by_timestep)
+    return hcat(mean_effort_by_timestep, mean_firm_output_by_timestep, mean_firm_size_by_timestep)'
 end
