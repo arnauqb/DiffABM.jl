@@ -15,7 +15,7 @@ struct Firm{T}
     size::Vector{T}  # Now a single-element vector
 end
 
-function compute_group_effort_from_output(output, effort, a, b)
+function compute_firm_effort_from_output(firm_output, firm_effort, a, b)
     """
     solves the equation output = a * (E + e) + b (E + e)^2 where E is the group effort (except the agent's one) and e is the individual effort.
     this expands to
@@ -77,11 +77,11 @@ end
 
 struct RandomAxtellAgentInitializer{T} <: AbstractAxtellAgentInitializer
     n_agents::Int64
-    thetas_bounds::Tuple{T,T}
-    endowments_bounds::Tuple{T,T}
-    initial_efforts_bounds::Tuple{T,T}
+    thetas_bounds::Vector{T}
+    initial_efforts_bounds::Vector{T}
     neighbours::Vector{Vector{Int64}}
 end
+@functor RandomAxtellAgentInitializer (thetas_bounds, initial_efforts_bounds)
 get_type(initializer::RandomAxtellAgentInitializer{T}) where {T} = T
 function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) where {T}
     agents = Vector{Agent{diff_type}}()
@@ -89,6 +89,8 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
     for i in 1:(initializer.n_agents)
         theta = convert(diff_type, initializer.thetas_bounds[1] +
                                    (initializer.thetas_bounds[2] - initializer.thetas_bounds[1]) * rand())
+        #endowment = convert(diff_type, initializer.endowments_bounds[1] +
+        #                     (initializer.endowments_bounds[2] - initializer.endowments_bounds[1]) * rand())
         endowment = convert(diff_type, 1.0)
         effort = initializer.initial_efforts_bounds[1] +
                  (initializer.initial_efforts_bounds[2] -
@@ -110,8 +112,8 @@ function compute_agent_utilities(
 
     # Current firm
     current_firm = firms[agent.firm_id[1]]
-    E_tilde_i = compute_group_effort_from_output(
-        current_firm.output[1], agent.effort[1], a, b)
+    current_firm_effort = compute_firm_effort_from_output(
+        current_firm.output[1], a, b)
     optimal_effort = compute_optimal_effort(agent.theta, agent.endowment, E_tilde_i, a, b)
     stay_utility = compute_utility(current_firm.output[1], current_firm.size[1],
         agent.theta, agent.endowment, optimal_effort)
@@ -206,11 +208,11 @@ end
 function reconstruct_firms_agents_no_gradient(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}) where {T}
     firms = [Firm(firm.id, convert.(T, ignore_gradient.(firm.output)), convert.(T, ignore_gradient.(firm.size))) for firm in firms]
     agents = [Agent(agent.id,
-                    convert.(T, ignore_gradient(agent.theta)),
-                    convert.(T, ignore_gradient(agent.endowment)),
-                    convert.(T, ignore_gradient.(agent.effort)),
-                    convert.(T, ignore_gradient.(agent.firm_id)),
-                    agent.neighbors) for agent in agents]
+        convert.(T, ignore_gradient(agent.theta)),
+        convert.(T, ignore_gradient(agent.endowment)),
+        convert.(T, ignore_gradient.(agent.effort)),
+        convert.(T, ignore_gradient.(agent.firm_id)),
+        agent.neighbors) for agent in agents]
     return firms, agents
 end
 
@@ -231,5 +233,5 @@ function abm_run(params::AxtellFirmsParams)
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in firms]))
         push!(mean_firm_size_by_timestep, mean([firm.size[1] for firm in firms if firm.size[1] > 0]))
     end
-    return hcat(mean_effort_by_timestep, mean_firm_size_by_timestep)'
+    return hcat(mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
 end
