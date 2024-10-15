@@ -1,4 +1,4 @@
-export AxtellFirmsParams
+export AxtellFirmsParams, CobbDouglasUtility, NeuralNetworkUtility
 
 struct Agent{T}
     id::Int64
@@ -13,6 +13,27 @@ struct Firm{T}
     id::T
     output::Vector{T}  # Now a single-element vector
     size::Vector{T}  # Now a single-element vector
+end
+
+abstract type UtilityFunction end
+struct CobbDouglasUtility <: UtilityFunction end
+get_type(utility::CobbDouglasUtility) = Float64
+struct NeuralNetworkUtility{T} <: UtilityFunction
+    nn::T
+end
+get_type(utility::NeuralNetworkUtility) = typeof(utility.nn.layers[1].weight[1])
+@functor NeuralNetworkUtility (nn,)
+function (utility::CobbDouglasUtility)(
+    firms_output, firms_size, theta_agent, endowment_agent, effort_agent)
+    if ignore_gradient(firms_output) == 0.0
+        return 0.0
+    end
+    return (firms_output / firms_size)^theta_agent *
+           (endowment_agent - effort_agent)^(1.0 - theta_agent)
+end
+function (utility::NeuralNetworkUtility)(
+    firms_output, firms_size, theta_agent, endowment_agent, effort_agent)
+    return utility.nn([firms_output, firms_size, theta_agent, endowment_agent, effort_agent])[1]
 end
 
 function compute_group_effort_from_output(firm_output, agent_effort, a, b)
@@ -36,14 +57,6 @@ function compute_optimal_effort(theta_i, omega_i, E_tilde_i, a, b)
     return max(numerator / denominator, zero(typeof(numerator)))
 end
 
-function compute_utility(
-    firms_output, firms_size, theta_agent, endowment_agent, effort_agent)
-    if ignore_gradient(firms_output) == 0.0
-        return 0.0
-    end
-    return (firms_output / firms_size)^theta_agent *
-           (endowment_agent - effort_agent)^(1.0 - theta_agent)
-end
 
 function compute_firms_output(group_effort, a, b)
     return a * group_effort + b * group_effort^2
@@ -105,7 +118,7 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
 end
 
 function compute_agent_utilities(
-    agents, agent::Agent{T}, firms::Vector{Firm{T}}, a::T, b::T) where {T}
+    agents, agent::Agent{T}, firms::Vector{Firm{T}}, utility_function::UtilityFunction, a, b) where {T}
     utilities = T[]
     firm_candidates_ids = T[]
     optimal_efforts = T[]
@@ -115,7 +128,7 @@ function compute_agent_utilities(
     E_tilde_i = compute_group_effort_from_output(
         current_firm.output[1], agent.effort[1], a, b)
     optimal_effort = compute_optimal_effort(agent.theta, agent.endowment, E_tilde_i, a, b)
-    stay_utility = compute_utility(current_firm.output[1], current_firm.size[1],
+    stay_utility = utility_function(current_firm.output[1], current_firm.size[1],
         agent.theta, agent.endowment, optimal_effort)
 
     push!(utilities, stay_utility)
@@ -125,7 +138,7 @@ function compute_agent_utilities(
     # New firm
     new_firm_output = compute_firms_output(agent.effort[1], a, b)
     optimal_effort = compute_optimal_effort(agent.theta, agent.endowment, zero(T), a, b)
-    startup_utility = compute_utility(
+    startup_utility = utility_function(
         new_firm_output, one(T), agent.theta, agent.endowment, optimal_effort)
 
     push!(utilities, startup_utility)
@@ -139,7 +152,7 @@ function compute_agent_utilities(
             neighbor_firm.output[1], agent.effort[1], a, b)
         optimal_effort = compute_optimal_effort(
             agent.theta, agent.endowment, E_tilde_i, a, b)
-        switch_utility = compute_utility(neighbor_firm.output[1], neighbor_firm.size[1],
+        switch_utility = utility_function(neighbor_firm.output[1], neighbor_firm.size[1],
             agent.theta, agent.endowment, optimal_effort)
 
         push!(utilities, switch_utility)
@@ -149,7 +162,7 @@ function compute_agent_utilities(
     return utilities, firm_candidates_ids, optimal_efforts
 end
 
-function update_firm_outputs!(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}, a::T, b::T) where {T}
+function update_firm_outputs!(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}, a, b) where {T}
     # Update firm outputs
     group_efforts = zeros(T, length(firms))
     for agent in agents
@@ -161,12 +174,12 @@ function update_firm_outputs!(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}, 
     end
 end
 
-function step!(agents::Vector{Agent{T}}, firms::Vector{Firm{T}}, a::T, b::T, activation_rate, delta_t) where {T}
+function step!(agents::Vector{Agent{T}}, firms::Vector{Firm{T}}, utility_function::UtilityFunction, a, b, activation_rate, delta_t) where {T}
     activation_probability = 1.0 - exp(-activation_rate * delta_t)
     for agent in agents
         if rand() < activation_probability
             utilities, firm_candidates_ids, optimal_efforts = compute_agent_utilities(
-                agents, agent, firms, a, b)
+                agents, agent, firms, utility_function, a, b)
             chosen_index_onehot = differentiable_argmax(utilities)
             # remove agent from old firm
             old_firm = firms[agent.firm_id[1]]
@@ -195,15 +208,15 @@ end
 
 struct AxtellFirmsParams{T}
     agent_initializer::AbstractAxtellAgentInitializer
+    utility_function::UtilityFunction
     a::Vector{T}
     b::Vector{T}
     activation_rate::Float64
     delta_t::Float64
     n_steps::Int64
-    soft_histogram_sigma::Float64
     gradient_horizon::Int64
 end
-@functor AxtellFirmsParams (agent_initializer, a, b)
+@functor AxtellFirmsParams (agent_initializer, utility_function, a, b)
 
 function reconstruct_firms_agents_no_gradient(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}) where {T}
     firms = [Firm(firm.id, convert.(T, ignore_gradient.(firm.output)), convert.(T, ignore_gradient.(firm.size))) for firm in firms]
@@ -218,9 +231,11 @@ end
 
 function abm_run(params::AxtellFirmsParams)
     diff_type = promote_type(
-        get_type(params.agent_initializer), typeof(params.a[1]), typeof(params.b[1]))
+        get_type(params.agent_initializer), typeof(params.a[1]), typeof(params.b[1]), get_type(params.utility_function))
     agents, firms = initialize(params.agent_initializer, diff_type)
-    update_firm_outputs!(firms, agents, params.a[1], params.b[1])
+    a = convert(diff_type, params.a[1])
+    b = convert(diff_type, params.b[1])
+    update_firm_outputs!(firms, agents, a, b)
     mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
     mean_firm_output_by_timestep = [mean([firm.output[1] for firm in firms])]
     mean_firm_size_by_timestep = [mean([firm.size[1] for firm in firms if firm.size[1] > 0])]
@@ -228,7 +243,7 @@ function abm_run(params::AxtellFirmsParams)
         if t % params.gradient_horizon == 0
             firms, agents = reconstruct_firms_agents_no_gradient(firms, agents)
         end
-        step!(agents, firms, params.a[1], params.b[1], params.activation_rate, params.delta_t)
+        step!(agents, firms, params.utility_function, params.a[1], params.b[1], params.activation_rate, params.delta_t)
         push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in firms]))
         push!(mean_firm_size_by_timestep, mean([firm.size[1] for firm in firms if firm.size[1] > 0]))
