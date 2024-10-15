@@ -15,15 +15,15 @@ struct Firm{T}
     size::Vector{T}  # Now a single-element vector
 end
 
-function compute_firm_effort_from_output(firm_output, firm_effort, a, b)
+function compute_group_effort_from_output(firm_output, agent_effort, a, b)
     """
     solves the equation output = a * (E + e) + b (E + e)^2 where E is the group effort (except the agent's one) and e is the individual effort.
     this expands to
     bx^2 + x * (a+2be) + a*e + b*e^2 - output = 0
     """
     A = b
-    B = a + 2b * effort
-    C = a * effort + b * effort^2 - output
+    B = a + 2b * agent_effort
+    C = a * agent_effort + b * agent_effort^2 - firm_output
     # solve the quadratic equation since A>0 take the positive root
     x = (-B + sqrt(B^2 - 4A * C + 1e-8)) / (2A) # add a small number to avoid NaNs
     return x
@@ -112,8 +112,8 @@ function compute_agent_utilities(
 
     # Current firm
     current_firm = firms[agent.firm_id[1]]
-    current_firm_effort = compute_firm_effort_from_output(
-        current_firm.output[1], a, b)
+    E_tilde_i = compute_group_effort_from_output(
+        current_firm.output[1], agent.effort[1], a, b)
     optimal_effort = compute_optimal_effort(agent.theta, agent.endowment, E_tilde_i, a, b)
     stay_utility = compute_utility(current_firm.output[1], current_firm.size[1],
         agent.theta, agent.endowment, optimal_effort)
@@ -208,8 +208,8 @@ end
 function reconstruct_firms_agents_no_gradient(firms::Vector{Firm{T}}, agents::Vector{Agent{T}}) where {T}
     firms = [Firm(firm.id, convert.(T, ignore_gradient.(firm.output)), convert.(T, ignore_gradient.(firm.size))) for firm in firms]
     agents = [Agent(agent.id,
-        convert.(T, ignore_gradient(agent.theta)),
-        convert.(T, ignore_gradient(agent.endowment)),
+        agent.theta,
+        agent.endowment,
         convert.(T, ignore_gradient.(agent.effort)),
         convert.(T, ignore_gradient.(agent.firm_id)),
         agent.neighbors) for agent in agents]
@@ -234,4 +234,5 @@ function abm_run(params::AxtellFirmsParams)
         push!(mean_firm_size_by_timestep, mean([firm.size[1] for firm in firms if firm.size[1] > 0]))
     end
     return hcat(mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
+    #return reshape(mean_firm_output_by_timestep, 1, :)
 end
