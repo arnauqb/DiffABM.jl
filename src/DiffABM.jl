@@ -34,6 +34,7 @@ include("GameOfLife.jl")
 include("RandomWalk.jl")
 include("SIR/sir.jl")
 include("SugarScape.jl")
-include("AxtellFirms.jl")
+include("AxtellFirms/AxtellFirms.jl")
+#include("AxtellFirms/AxtellFirmsVectorized.jl")
 
 end

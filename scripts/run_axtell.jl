@@ -11,7 +11,7 @@ function make_abm_params(a, b)
     n_agents = 1000
     n_timesteps = 100
     neighbors = [sample(1:n_agents, rand(2:6), replace = false) for _ in 1:n_agents]
-    agent_initializer = DiffABM.RandomAxtellAgentInitializer(n_agents, (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), neighbors)
+    agent_initializer = DiffABM.RandomAxtellAgentInitializer(n_agents, [0.0, 1.0], [0.0, 1.0], neighbors)
     return DiffABM.AxtellFirmsParams(agent_initializer, [a], [b], 0.05, 1.0, n_timesteps, 1.0)
 end
 function run(params)
