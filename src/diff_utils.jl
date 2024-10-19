@@ -102,7 +102,8 @@ function random_argmax(array)
     return rand(max_indices)
 end
 function differentiable_argmax(array)
-    soft = my_softmax(array .+ 1.0) # add 1.0 to avoid overflow
+    # shift by maximum to avoid overflow
+    soft = my_softmax(array .- maximum(array))
     hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
