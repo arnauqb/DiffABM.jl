@@ -91,8 +91,8 @@ function differentiable_gate(smoothing::StepSmoothing, a, b, x::Real)
     return hard_gate(a, b, x) + (soft - ignore_gradient(soft))
 end
 
-function my_softmax(array)
-    return exp.(array) ./ sum(exp.(array))
+function my_softmax(array; k=1.0)
+    return exp.(k .* array) ./ sum(exp.(k .* array))
 end
 
 ## Differentiable argmax
@@ -101,9 +101,9 @@ function random_argmax(array)
     max_indices = findall(x -> x == max_value, array)
     return rand(max_indices)
 end
-function differentiable_argmax(array)
+function differentiable_argmax(array; k=1.0)
     # shift by maximum to avoid overflow
-    soft = my_softmax(array .- maximum(array))
+    soft = my_softmax(array .- maximum(array), k=k)
     hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
