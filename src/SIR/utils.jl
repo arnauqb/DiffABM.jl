@@ -1,4 +1,4 @@
-export symmetrize_edges
+export symmetrize_edges, generate_random_world_graph
 
 """
 Given a named tuple of edges, adds the reverse edges to the named tuple.
@@ -28,21 +28,23 @@ function gamma_pdf(μ, σ, x)
 end
 
 function generate_random_world_graph(
-        n_agents, venues, fraction_population_per_venue, number_per_venue)
+        n_agents, venues, number_per_venue, prob_per_venue)
     n_venues = length(venues)
     num_nodes = Dict(:agent => n_agents)
     eindex_dict = Dict()
     edata = Dict()
     for i in 1:n_venues
-        n_agents_in_venue = Int(floor(n_agents * fraction_population_per_venue[i]))
-        agents_in_venue = randperm(n_agents)[1:n_agents_in_venue]
-        n_people_per_venue = number_per_venue[i]
-        edges_venue = agents_in_venue, rand(1:n_people_per_venue, n_agents_in_venue)
-        venue_symbol = Symbol(venues[i])
-        eindex_dict[(:agent, :attends, venue_symbol)] = edges_venue
-        edata[(:agent, :attends, venue_symbol)] = ones(n_agents_in_venue)
-        eindex_dict[(venue_symbol, :attends, :agent)] = (edges_venue[2], edges_venue[1])
-        num_nodes[venue_symbol] = n_people_per_venue
+        n_this_venue = number_per_venue[i]
+        prob_attendance_venue = prob_per_venue[i]
+        agents_connect = rand(Bernoulli(prob_attendance_venue), n_agents)
+        venues_to_connect = rand(1:n_venues, n_agents)
+        senders = collect(1:n_agents)[agents_connect]
+        receivers = venues_to_connect[agents_connect]
+        venue_symbol = venues[i]
+        prob_attendance_venue = prob_per_venue[i]
+        eindex_dict[(:agent, :attends, venue_symbol)] = (senders, receivers)
+        eindex_dict[(venue_symbol, :attends, :agent)] = (receivers, senders)
+        num_nodes[venue_symbol] = n_this_venue
     end
     eindex = (k => v for (k, v) in eindex_dict)
     edata = (k => v for (k, v) in edata)

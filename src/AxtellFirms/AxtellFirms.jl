@@ -1,4 +1,4 @@
-export AxtellFirmsParams
+export AxtellFirmsParams, RandomAxtellAgentInitializer
 
 struct Agent{T}
     id::Int64

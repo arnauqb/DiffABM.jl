@@ -137,8 +137,7 @@ function initialize_agents(initializer::RandomAgentInitializer{T, Q, R, S, U},
     metabolic_rate_probs = metabolic_rate_probs ./ sum(metabolic_rate_probs)
     metabolic_rate_probs = reshape(metabolic_rate_probs, :, 1)
     for i in 1:n_agents
-        #vision = vision_bounds[1] + rand() * (vision_bounds[2] - vision_bounds[1])
-        vision = 1.0 * sample_categorical(SAD(), vision_probs)[1]
+        vision = sample_categorical(SAD(), vision_probs)[1]
         metabolic_rate = 2 + sample_categorical(SAD(), metabolic_rate_probs)[1]
         max_age = rand(initializer.max_age_distribution)
         wealth = convert(diff_type, rand(initializer.wealth_distribution))
