@@ -15,8 +15,11 @@ struct Firm{T}
 end
 
 abstract type UtilityFunction end
+
 struct CobbDouglasUtility <: UtilityFunction end
+
 get_type(utility::CobbDouglasUtility) = Float64
+
 function (utility::CobbDouglasUtility)(
     firms_output, firms_size, theta_agent, effort_agent)
     if ignore_gradient(firms_output) == 0.0
@@ -36,7 +39,7 @@ function compute_group_effort_from_output(firm_output, agent_effort, a, b)
     B = a + 2b * agent_effort
     C = a * agent_effort + b * agent_effort^2 - firm_output
     # solve the quadratic equation since A>0 take the positive root
-    x = (-B + sqrt(B^2 - 4A * C + 1e-8)) / (2A) # add a small number to avoid NaNs
+    x = (-B + sqrt(B^2 - 4A * C + 1e-10)) / (2A) # add a small number to avoid NaNs
     return x
 end
 
@@ -45,7 +48,11 @@ function compute_optimal_effort(theta_i, E_tilde_i, a, b)
     numerator += sqrt(a^2 + 4 * a * b * theta_i^2 * (1 + E_tilde_i) +
                       4 * b^2 * theta_i^2 * (1 + E_tilde_i)^2)
     denominator = 2b * (1 + theta_i)
-    return max(numerator / denominator, zero(typeof(numerator)))
+    #is_negative = ignore_gradient(numerator) < 0.0
+    is_negative = differentiable_is_less(GaussianSmoothing(0.35), numerator, zero(typeof(numerator)))
+    #is_negative = differentiable_is_less(SigmoidSmoothing(0.1), numerator, zero(typeof(numerator)))
+    #is_negative = differentiable_is_less(PiecewiseSmoothing([-2.0, 2.0]), numerator, zero(typeof(numerator)))
+    return (numerator / denominator) * (1.0 - is_negative)
 end
 
 function compute_firms_output(group_effort, a, b)
@@ -240,24 +247,23 @@ function abm_run(params::AxtellFirmsParams)
     a = convert(diff_type, params.a[1])
     b = convert(diff_type, params.b[1])
     update_firm_outputs!(firms, agents, a, b)
-    mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
+    #mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
     mean_firm_output_by_timestep = [mean([firm.output[1] for firm in values(firms) if firm.size[1] > 0])]
-    mean_firm_size_by_timestep = [mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0])]
+    #mean_firm_size_by_timestep = [mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0])]
     for t in 2:(params.n_steps)
         if t % params.gradient_horizon == 0
             firms, agents = reconstruct_firms_agents_no_gradient(firms, agents)
         end
         step!(agents, firms, utility_function, params.a[1],
             params.b[1], params.activation_rate, params.delta_t)
-        push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
+        #push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in values(firms) if firm.size[1] > 0]))
-        push!(mean_firm_size_by_timestep,
-            mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0]))
+        #push!(mean_firm_size_by_timestep,
+            #mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0]))
     end
     #return hcat(
-    #    mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
-    #return hcat(
-    #    mean_effort_by_timestep, mean_firm_output_by_timestep)'
+        #mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
+    #return hcat(mean_effort_by_timestep, mean_firm_output_by_timestep)'
     #return [firm.size[1] for firm in firms if firm.size[1] > 0]
     return reshape(mean_firm_output_by_timestep, 1, :)
 end

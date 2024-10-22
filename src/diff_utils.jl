@@ -111,12 +111,12 @@ end
 
 ## Differentiable is less and is greater
 
-function differentiable_is_greater(smoothing::StepSmoothing, x, y)
-    return differentiable_step(smoothing, y, x)
+function differentiable_is_greater(smoothing::StepSmoothing, x, threshold)
+    return differentiable_step(smoothing, threshold, x)
 end
 
-function differentiable_is_less(smoothing::StepSmoothing, x, y)
-    return 1.0 - differentiable_is_greater(smoothing, x, y)
+function differentiable_is_less(smoothing::StepSmoothing, x, threshold)
+    return 1.0 - differentiable_is_greater(smoothing, x, threshold)
 end
 
 ## logic
