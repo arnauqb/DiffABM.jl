@@ -101,9 +101,16 @@ function random_argmax(array)
     max_indices = findall(x -> x == max_value, array)
     return rand(max_indices)
 end
-function differentiable_argmax(array; k=1.0)
+function differentiable_argmax(array::Vector{<:StochasticAD.StochasticTriple})
     # shift by maximum to avoid overflow
-    soft = my_softmax(array .- maximum(array), k=k)
+    soft = my_softmax(array .- maximum(array))
+    hard = random_argmax(ignore_gradient.(array))
+    hard_onehot = Flux.onehot(hard, 1:length(array))
+    return hard_onehot + (soft - ignore_gradient.(soft))
+end
+function differentiable_argmax(array)
+    # shift by maximum to avoid overflow
+    soft = Flux.softmax(array)
     hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
@@ -149,6 +156,9 @@ function differentiable_index(smoothing::StepSmoothing, array, index)
     soft = soft_index(smoothing, array, index)
     hard = array[Int64(ignore_gradient(index))]
     return @. hard + (soft - ignore_gradient(soft))
+end
+
+function soft_index_to_onehot(array, index)
 end
 
 ## soft histogram
@@ -221,3 +231,5 @@ function kde(samples, evaluation_points; bandwidth=nothing)
     
     return density
 end
+
+Base.isinteger(x::Real, tol::Float64) = abs(round(x) - x) < tol

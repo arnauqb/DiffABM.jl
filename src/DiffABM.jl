@@ -24,7 +24,8 @@ abm_run(params) = throw("Not implemented for $(typeof(params))")
 abm_step(params) = throw("Not implemented for $(typeof(params))")
 abm_logpdf(params) = throw("Not implemented for $(typeof(params))")
 
-# Write your package code here.
+# Utils
+include("utils.jl")
 include("diff_utils.jl")
 include("discrete_randomness.jl")
 

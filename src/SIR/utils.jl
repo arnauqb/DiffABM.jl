@@ -50,38 +50,3 @@ function generate_random_world_graph(
     edata = (k => v for (k, v) in edata)
     return GNNHeteroGraph(eindex; num_nodes, edata)
 end
-
-
-Base.isinteger(x::Real, tol::Float64) = abs(round(x) - x) < tol
-
-function Base.getindex(vector::AbstractVector, i::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    return vector[Int64(round(i))]
-end
-function Base.setindex!(vector::AbstractVector, v, i::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    return vector[Int64(round(i))] = v
-end
-
-function Base.getindex(board::AbstractArray, i::T,
-        j::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    j = StochasticAD.value(j)
-    #@assert isinteger(i, 1e-6)
-    #@assert isinteger(j, 1e-6)
-    return board[Int64(round(i)), Int64(round(j))]
-end
-function Base.setindex!(board::AbstractArray, v, i::T,
-        j::T) where {T <: Union{Float64, ForwardDiff.Dual, StochasticAD.StochasticTriple}}
-    i = StochasticAD.value(i)
-    j = StochasticAD.value(j)
-    #@assert isinteger(i, 1e-6)
-    #@assert isinteger(j, 1e-6)
-    return board[Int64(round(i)), Int64(round(j))] = v
-end
-
-function wrap_index(N, i, j)
-    # given board length N, and index i, j
-    # return the wrapped index to make the board toroidal
-    return mod(i - 1, N) + 1, mod(j - 1, N) + 1
-end
