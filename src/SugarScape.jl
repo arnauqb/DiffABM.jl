@@ -81,7 +81,7 @@ except for the squares that are away from the center by a distance less than or 
 vision_radius varies from 1 to max_vision.
 """
 function generate_vision_matrices(neighborhood::Neighborhood, max_vision)
-    vision_matrices = []
+    vision_matrices = Matrix{Float64}[]
     N = 2 * max_vision + 1
     for vision_radius in 1:max_vision
         vision_matrix = zeros(N, N)
