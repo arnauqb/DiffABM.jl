@@ -178,15 +178,17 @@ function initialize_agents(initializer::RandomAgentInitializer{T, Q, R, W, U, N,
     vision_probs = initializer.vision_distribution_probs
     # try to enlarge
     #vision_probs = sigmoid.(5 * (vision_probs .- 0.5))
-    vision_probs[1] = vision_probs[1] * sigmoid.(2 * (vision_probs[1] - 0.9))
-    vision_probs[2] = vision_probs[2] * sigmoid.(2 * (vision_probs[2] - 0.1))
+    k = 5
+    if ignore_gradient.(vision_probs) != [0.9, 0.1]
+        vision_probs = sigmoid.(k * (vision_probs .- [0.9, 0.1]))
+    end
     vision_probs = vision_probs ./ sum(vision_probs)
     metabolic_rate_probs = initializer.metabolic_rate_probs
     metabolic_rate_probs = metabolic_rate_probs ./ sum(metabolic_rate_probs)
     metabolic_rate_probs = reshape(metabolic_rate_probs, :, 1)
     max_vision = length(vision_probs)
 
-    vision_matrices = generate_vision_matrices(initializer.neighborhood, max_vision)
+    vision_matrices = generate_vision_matrices(initializer.neighborhood, 5)
     vision_matrices = vision_matrices[[1, end]]
     for i in 1:n_agents
         vision_matrix = sample_vision(initializer.discrete_sampler, vision_matrices, vision_probs)
