@@ -65,6 +65,7 @@ struct GeneratedAxtellAgentInitializer{T} <: AbstractAxtellAgentInitializer
     efforts::Vector{T}
     neighbors::Vector{Vector{Int64}}
 end
+@functor GeneratedAxtellAgentInitializer (thetas, efforts)
 get_type(initializer::GeneratedAxtellAgentInitializer{T}) where {T} = T
 
 function initialize(initializer::GeneratedAxtellAgentInitializer{T}, diff_type) where {T}

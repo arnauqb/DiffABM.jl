@@ -4,6 +4,7 @@ using ChainRulesCore
 import Distributions
 using DiffResults
 using Distributions
+using DistributionsAD
 using DataStructures
 using ForwardDiff
 using Functors
