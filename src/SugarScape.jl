@@ -320,7 +320,7 @@ struct SugarScapeParams{T,Q,R,SM}
     gradient_horizon::Int64
     smoothing::SM
 end
-@functor SugarScapeParams (board_initializer, agent_initializer, sugar_regeneration_rate)
+@functor SugarScapeParams (agent_initializer, )
 
 function reset_gradient!(board, agents, occupied, time, gradient_horizon)
     if time % gradient_horizon == 0

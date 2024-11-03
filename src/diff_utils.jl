@@ -79,7 +79,7 @@ end
 
 ## Differentiable gate
 function hard_gate(a, b, x)
-    return x >= a && x <= b ? 1.0 : 0.0
+    return x > a && x < b ? 1.0 : 0.0
 end
 
 function soft_gate(smoothing::StepSmoothing, a, b, x)

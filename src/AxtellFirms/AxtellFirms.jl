@@ -70,21 +70,15 @@ get_type(initializer::GeneratedAxtellAgentInitializer{T}) where {T} = T
 
 function initialize(initializer::GeneratedAxtellAgentInitializer{T}, diff_type) where {T}
     agents = Vector{Agent{diff_type}}()
-    firms = Vector{Firm{diff_type}}()
-
-    for i in 1:length(initializer.thetas)
-        theta = initializer.thetas[i]
-        effort = [initializer.efforts[i]]
-        neighbors = initializer.neighbors[i]
-
-        push!(
-            agents, Agent(i, theta, effort, [convert(diff_type, i)], neighbors))
-        push!(firms, Firm(i, [zero(diff_type)], [one(diff_type)]))
-    end
+    agents = [
+        Agent(i, initializer.thetas[i], [initializer.efforts[i]], [i], initializer.neighbors[i])
+        for i in 1:length(initializer.thetas)
+    ]
+    firms = Dict(i => Firm(i, [one(diff_type)], [one(diff_type)]) for i in 1:length(initializer.thetas))
     return agents, firms
 end
 
-struct RandomAxtellAgentInitializer{T, Q} <: AbstractAxtellAgentInitializer
+struct RandomAxtellAgentInitializer{T,Q} <: AbstractAxtellAgentInitializer
     n_agents::Int64
     thetas_bounds::Vector{T}
     initial_efforts_bounds::Vector{Q}
@@ -96,12 +90,10 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
     agents = Vector{Agent{diff_type}}()
     for i in 1:(initializer.n_agents)
         theta = convert(diff_type,
-            initializer.thetas_bounds[1] +
-            (initializer.thetas_bounds[2] - initializer.thetas_bounds[1]) * rand())
-        effort = initializer.initial_efforts_bounds[1] +
-                 (initializer.initial_efforts_bounds[2] -
-                  initializer.initial_efforts_bounds[1]) * rand()
-        effort = [convert(diff_type, effort)]
+            rand(Beta(initializer.thetas_bounds[1], initializer.thetas_bounds[2])))
+        effort = [convert(diff_type,
+            rand(Beta(initializer.initial_efforts_bounds[1],
+                initializer.initial_efforts_bounds[2])))]
         neighbors = initializer.neighbours[i]
         agent = Agent(i, theta, effort, [i], neighbors)
         push!(agents, agent)
@@ -248,23 +240,19 @@ function abm_run(params::AxtellFirmsParams)
     a = convert(diff_type, params.a[1])
     b = convert(diff_type, params.b[1])
     update_firm_outputs!(firms, agents, a, b)
-    #mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
+    mean_effort_by_timestep = [mean([agent.effort[1] for agent in agents])]
     mean_firm_output_by_timestep = [mean([firm.output[1] for firm in values(firms) if firm.size[1] > 0])]
-    #mean_firm_size_by_timestep = [mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0])]
+    mean_firm_size_by_timestep = [mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0])]
     for t in 2:(params.n_steps)
         if t % params.gradient_horizon == 0
             firms, agents = reconstruct_firms_agents_no_gradient(firms, agents)
         end
         step!(agents, firms, utility_function, params.a[1],
             params.b[1], params.activation_rate, params.delta_t)
-        #push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
+        push!(mean_effort_by_timestep, mean([agent.effort[1] for agent in agents]))
         push!(mean_firm_output_by_timestep, mean([firm.output[1] for firm in values(firms) if firm.size[1] > 0]))
-        #push!(mean_firm_size_by_timestep,
-            #mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0]))
+        push!(mean_firm_size_by_timestep,
+            mean([firm.size[1] for firm in values(firms) if firm.size[1] > 0]))
     end
-    #return hcat(
-        #mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
-    #return hcat(mean_effort_by_timestep, mean_firm_output_by_timestep)'
-    #return [firm.size[1] for firm in firms if firm.size[1] > 0]
-    return reshape(mean_firm_output_by_timestep, 1, :)
+    return hcat(mean_effort_by_timestep, mean_firm_size_by_timestep, mean_firm_output_by_timestep)'
 end

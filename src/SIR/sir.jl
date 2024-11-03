@@ -18,7 +18,7 @@ struct SIRParams{G, TI, TB, TG, S, I}
 	infection_type::I
 	policies::Policies
 end
-@functor SIRParams (initial_infected, venue_betas, gamma, graph_generator, policies)
+#@functor SIRParams (initial_infected, venue_betas, gamma, graph_generator, policies)
 get_betas_by_venue(p::SIRParams) = Dict(zip(p.venues, p.venue_betas))
 
 struct Results{T}
@@ -63,16 +63,16 @@ function compute_transmission(
 	return transmission
 end
 
-function compute_transmission(
-	graph, sampler, policies, venues, betas::Vector{T}, S::Vector{T}, I::Vector{T},
-	infection_times::Vector{T}, infection_type, time, delta_t) where {T <:
-		 StochasticAD.StochasticTriple}
-	return StochasticAD.propagate(
-		(policies, betas, S, I, infection_times) -> compute_transmission(
-			graph, sampler, policies, venues, betas, S, I,
-			infection_times, infection_type, time, delta_t),
-		policies, betas, S, I, infection_times, keep_deltas = Val(true))
-end
+#function compute_transmission(
+#	graph, sampler, policies, venues, betas::Vector{T}, S::Vector{T}, I::Vector{T},
+#	infection_times::Vector{T}, infection_type, time, delta_t) where {T <:
+#		 StochasticAD.StochasticTriple}
+#	return StochasticAD.propagate(
+#		(policies, betas, S, I, infection_times) -> compute_transmission(
+#			graph, sampler, policies, venues, betas, S, I,
+#			infection_times, infection_type, time, delta_t),
+#		policies, betas, S, I, infection_times, keep_deltas = Val(true))
+#end
 
 function compute_recovery(I, gamma, delta_t)
 	recovery = I .* (1.0 - exp(-gamma * delta_t))
@@ -80,12 +80,12 @@ function compute_recovery(I, gamma, delta_t)
 	return recovery
 end
 
-function compute_recovery(I::Vector{T}, gamma::T,
-	delta_t) where {T <: StochasticAD.StochasticTriple}
-	return StochasticAD.propagate(
-		(I, gamma) -> compute_recovery(I, gamma, delta_t),
-		I, gamma, keep_deltas = Val(true), provided_st_rep = gamma)
-end
+#function compute_recovery(I::Vector{T}, gamma::T,
+#	delta_t) where {T <: StochasticAD.StochasticTriple}
+#	return StochasticAD.propagate(
+#		(I, gamma) -> compute_recovery(I, gamma, delta_t),
+#		I, gamma, keep_deltas = Val(true), provided_st_rep = gamma)
+#end
 
 function sir_step(graph, S, I, R, infection_times, venues, betas, gamma, time, delta_t,
 	sampler, infection_type, policies)
@@ -119,8 +119,9 @@ function abm_run(params::SIRParams)
 		params.discrete_sampler, n_agents, params.initial_infected[1], T)
 	delta_I_ts = [sum(x[4])]
     delta_R_ts = [sum(x[5])]
-	for t in 2:(params.n_timesteps)
-		x = abm_step(params, graph, x, t)
+	for i in 2:(params.n_timesteps)
+		time = i * params.delta_t
+		x = abm_step(params, graph, x, time)
 		delta_I_ts = vcat(delta_I_ts, [sum(x[4])])
         delta_R_ts = vcat(delta_R_ts, [sum(x[5])])
 	end
