@@ -91,9 +91,13 @@ function initialize(initializer::RandomAxtellAgentInitializer{T}, diff_type) whe
     for i in 1:(initializer.n_agents)
         theta = convert(diff_type,
             rand(Beta(initializer.thetas_bounds[1], initializer.thetas_bounds[2])))
+        # avoid NaNs
+        eps = 1e-10
+        theta = @. min(max(theta, eps), 1.0 - eps)
         effort = [convert(diff_type,
             rand(Beta(initializer.initial_efforts_bounds[1],
                 initializer.initial_efforts_bounds[2])))]
+        effort = @. min(max(effort, eps), 1.0 - eps)
         neighbors = initializer.neighbours[i]
         agent = Agent(i, theta, effort, [i], neighbors)
         push!(agents, agent)
