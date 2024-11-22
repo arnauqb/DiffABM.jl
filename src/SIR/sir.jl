@@ -18,7 +18,7 @@ struct SIRParams{G, TI, TB, TG, S, I}
 	infection_type::I
 	policies::Policies
 end
-@functor SIRParams (initial_infected, venue_betas, gamma, graph_generator, policies)
+#@functor SIRParams (initial_infected, venue_betas, gamma, graph_generator, policies)
 get_betas_by_venue(p::SIRParams) = Dict(zip(p.venues, p.venue_betas))
 
 struct Results{T}
