@@ -1,4 +1,4 @@
-export symmetrize_edges, generate_random_world_graph
+export symmetrize_edges, generate_random_world_graph, generate_random_graph_single_venue_type, generate_complete_graph
 
 """
 Given a named tuple of edges, adds the reverse edges to the named tuple.
@@ -27,8 +27,16 @@ function gamma_pdf(μ, σ, x)
     return ret
 end
 
+function generate_complete_graph(n_agents)
+    senders = collect(1:n_agents)
+    receivers = ones(Int64, n_agents)
+    eindex = ((:agent, :attends, :venue) => (senders, receivers),
+        (:venue, :attends, :agent) => (receivers, senders))
+    return GNNHeteroGraph(eindex; num_nodes=Dict(:agent => n_agents, :venue => 1))
+end
+
 function generate_random_world_graph(
-        n_agents, venues, number_per_venue, prob_per_venue)
+    n_agents, venues, number_per_venue, prob_per_venue)
     n_venues = length(venues)
     num_nodes = Dict(:agent => n_agents)
     eindex_dict = Dict()
@@ -37,7 +45,7 @@ function generate_random_world_graph(
         n_this_venue = number_per_venue[i]
         prob_attendance_venue = prob_per_venue[i]
         agents_connect = rand(Bernoulli(prob_attendance_venue), n_agents)
-        venues_to_connect = rand(1:n_venues, n_agents)
+        venues_to_connect = rand(1:n_this_venue, n_agents)
         senders = collect(1:n_agents)[agents_connect]
         receivers = venues_to_connect[agents_connect]
         venue_symbol = venues[i]
@@ -49,4 +57,14 @@ function generate_random_world_graph(
     eindex = (k => v for (k, v) in eindex_dict)
     edata = (k => v for (k, v) in edata)
     return GNNHeteroGraph(eindex; num_nodes, edata)
+end
+
+function generate_random_graph_single_venue_type(n_agents, n_venues, n_edges)
+    # randomly connect agents with venues given n_edges
+    senders = rand(1:n_agents, n_edges)
+    receivers = rand(1:n_venues, n_edges)
+    eindex = ((:agent, :attends, :venue) => (senders, receivers),
+        (:venue, :attends, :agent) => (receivers, senders))
+    num_nodes = Dict(:agent => n_agents, :venue => n_venues)
+    return GNNHeteroGraph(eindex; num_nodes)
 end

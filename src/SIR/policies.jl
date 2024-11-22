@@ -6,7 +6,7 @@ Base.getindex(ps::AbstractPolicies, i) = ps.policies[i]
 
 function is_active(time, start_time, end_time)
 	hard = time >= start_time && time < end_time
-	smoothing = GaussianSmoothing(0.25)
+	smoothing = GaussianSmoothing(1.0)
 	soft = smoothing(time - start_time) * smoothing(end_time - time)
 	return hard + (soft - ignore_gradient.(soft))
 end

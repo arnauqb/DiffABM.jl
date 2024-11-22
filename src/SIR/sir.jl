@@ -113,7 +113,7 @@ end
 function abm_run(params::SIRParams)
 	T = promote_type(eltype(params.initial_infected), eltype(params.gamma),
 		eltype(params.venue_betas))
-	graph = params.graph_generator()
+	graph = params.graph_generator.graph
     n_agents = graph.num_nodes[:agent]
 	x = initialize(
 		params.discrete_sampler, n_agents, params.initial_infected[1], T)
