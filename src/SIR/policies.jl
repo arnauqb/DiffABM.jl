@@ -4,6 +4,13 @@ abstract type AbstractPolicy end
 abstract type AbstractPolicies end
 Base.getindex(ps::AbstractPolicies, i) = ps.policies[i]
 
+function is_active(time, start_time, end_time)
+	hard = time >= start_time && time < end_time
+	smoothing = GaussianSmoothing(1.0)
+	soft = smoothing(time - start_time) * smoothing(end_time - time)
+	return hard + (soft - ignore_gradient.(soft))
+end
+
 struct SocialDistancing{T, U, V} <: AbstractPolicy
 	start_time::Vector{V}
 	end_time::Vector{V}
@@ -29,7 +36,7 @@ end
 
 
 function (p::SocialDistancing)(x, time, venue)
-	mask = differentiable_gate(GaussianSmoothing(1.0), p.start_time[1], p.end_time[1], time)
+	mask = is_active(time, p.start_time[1], p.end_time[1])
     # search venue in p.venues if there is no match return 1.0
     venue_index = findfirst(==(venue), p.venues)
     if venue_index === nothing
@@ -67,11 +74,11 @@ function QuarantinePolicies(config::Dict)
 end
 
 function (p::Quarantine)(sampler, transmission, time)
-	mask = differentiable_gate(GaussianSmoothing(1.0), p.start_time[1], p.end_time[1], time)
+	active = is_active(time, p.start_time[1], p.end_time[1])
 	quarantine_probs = ones(length(transmission)) .* p.p[1]
 	#does_quarantine = sample_bernoulli(sampler, quarantine_probs)
 	#return @. transmission * (mask * does_quarantine + (1.0 - mask))
-	return @. transmission * (mask * (1.0 - quarantine_probs) + (1.0 - mask))
+	return @. transmission * (active * (1.0 - quarantine_probs) + (1.0 - active))
 end
 
 function (p::QuarantinePolicies)(sampler, transmission, time)
