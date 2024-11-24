@@ -18,11 +18,9 @@ function make_sir(;
         quarantine_end_date,
         quarantine_prob
 )
-    n_agents = 5000
-    venues = [:household, :workplace, :leisure]
-    number_per_venue = [300, 50, 100]
-    prob_per_venue = [1.0, 0.2, 0.1]
-    graph = generate_random_world_graph(n_agents, venues, number_per_venue, prob_per_venue)
+    n_agents = 10000
+    venues = [:venue]
+    graph = generate_complete_graph(n_agents)
     generator = ConstantGraph(graph)
     # format: start date, end date, quarantine prob
     quarantine = Quarantine(
@@ -31,7 +29,7 @@ function make_sir(;
     # format: start date, end date, venues, social distancing prob
     social_distancing = SocialDistancing(
         [social_distancing_start_date], [social_distancing_end_date],
-        [:household, :workplace, :leisure], social_distancing_probs)
+        [:venue], social_distancing_probs)
     social_distancing_policies = SocialDistancingPolicies([social_distancing])
     policies = Policies(social_distancing_policies, quarantine_policies)
     initial_infected = [initial_infected]
@@ -44,14 +42,14 @@ function make_sir(;
     return sir_params
 end
 sir_params = make_sir(
-    initial_infected = 0.01,
-    betas = [0.3, 0.2, 0.2],
+    initial_infected = 0.005,
+    betas = [0.3],
     gamma = 0.05,
-    social_distancing_start_date = 7.0,
-    social_distancing_end_date = 35.0,
-    social_distancing_probs = [0.7, 0.5, 0.3],
-    quarantine_start_date = 12.0,
-    quarantine_end_date = 20.0,
+    social_distancing_start_date = 12.0,
+    social_distancing_end_date = 40.0,
+    social_distancing_probs = [0.5],
+    quarantine_start_date = 20.0,
+    quarantine_end_date = 30.0,
     quarantine_prob = 0.8
 )
 x = abm_run(sir_params)

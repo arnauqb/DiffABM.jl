@@ -64,10 +64,7 @@ function compute_optimal_effort(theta_i, E_tilde_i, firm_a, firm_b)
     numerator += sqrt(firm_a^2 + 4 * firm_a * firm_b * theta_i^2 * (1 + E_tilde_i) +
                       4 * firm_b^2 * theta_i^2 * (1 + E_tilde_i)^2)
     denominator = 2 * firm_b * (1 + theta_i)
-    #is_negative = ignore_gradient(numerator) < 0.0
     is_negative = differentiable_is_less(GaussianSmoothing(1.0), numerator, zero(typeof(numerator)))
-    #is_negative = differentiable_is_less(SigmoidSmoothing(0.1), numerator, zero(typeof(numerator)))
-    #is_negative = differentiable_is_less(PiecewiseSmoothing([-2.0, 2.0]), numerator, zero(typeof(numerator)))
     return (numerator / denominator) * (1.0 - is_negative)
 end
 

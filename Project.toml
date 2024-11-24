@@ -16,6 +16,7 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
 GraphNeuralNetworks = "cffab07f-9bc2-4db1-8861-388f63bf7694"
 GumbelSoftmax = "f60ed98c-c695-46ff-9817-9af1b038875e"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 LERC_jll = "88015f11-f218-50d7-93a8-a6af411a945d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NNlib = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
@@ -29,6 +30,7 @@ StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+Images = "0.26.1"
 julia = "1.10"
 
 [extras]

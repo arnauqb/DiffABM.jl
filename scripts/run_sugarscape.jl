@@ -2,6 +2,7 @@ using DiffABM
 using Distributions
 using DistributionsAD
 using Flux
+using Images
 using DelimitedFiles
 using PyPlot
 using Random
@@ -9,47 +10,57 @@ using PyCall
 animation = pyimport("matplotlib.animation")
 
 ##
-function make_sugarscape_params(vision_probs, metabolic_rate_probs)
-    board_length = 50
-    n_agents = 1000
-    n_timesteps = 50
-    board = readdlm("scripts/sugar-map.txt")[:]
+function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds)
+    board_length = 75
+    n_agents = 200
+    n_timesteps = 100
+    board = readdlm("scripts/sugar-map.txt")
+    board = Images.imresize(board, (board_length, board_length))[:]
+    board = exp.(board ./ 2) # this makes the impact of vision higher.
     board_initializer = GeneratedBoard(board_length, board)
-    #positions = [rand(1:board_length, 2) for i in 1:n_agents]
-    max_age_distribution = Uniform(60.0, 100.0)
-    wealth_distribution = DiscreteUniform(6, 25)
     discrete_sampler = ST()
     neighborhood = VonNeumannNeighborhood()
     sugar_regeneration_rate = 1.0
-    gradient_horizon = 500
+    gradient_horizon = 10000
     agent_initializer = RandomAgentInitializer(
-        board_length; vision_distribution_probs = vision_probs,
-        metabolic_rate_probs = metabolic_rate_probs,
-        neighborhood = neighborhood, discrete_sampler = discrete_sampler,
-        wealth_distribution = wealth_distribution, max_age_distribution = max_age_distribution)
+        board_length,
+        vision_distribution_probs = vision_probs,
+        metabolic_rate_bounds = metabolic_rate_bounds,
+        wealth_bounds = wealth_bounds,
+        neighborhood = neighborhood,
+        discrete_sampler = discrete_sampler)
     smoothing = GaussianSmoothing(1.0)
     sugarscape = SugarScapeParams(
         board_initializer, agent_initializer, board_length,
         n_agents, n_timesteps, [sugar_regeneration_rate], gradient_horizon, smoothing)
     return sugarscape
 end
-sugarscape_params = make_sugarscape_params([0.0, 0.0, 1.0], [0.75, 0.25]);
+vision_probs = [0.2, 0.8]
+metabolic_rate_bounds = [2.0, 5.0] # define a beta distribution
+wealth_bounds = [5.0, 2.0] # define a beta distribution
+sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
 x = abm_run(sugarscape_params);
 # this outputs: board_history, x_history, y_history, wealth_history, alive_history, occupied_history
 # note that these have all the agents!
+function summarizer(x)
+    n_timesteps = length(x[5])
+    n_agents = length(x[5][1])
+    alive_per_timestep = [sum(x[5][t]) / n_agents for t in 1:n_timesteps]
+    return reshape(alive_per_timestep, 1, :)
+end
 
 ##
 fig, ax = plt.subplots()
 # plot total wealth history
-wealth_history_ts = [sum(x[4][i]) for i in 1:length(x[4])]
-ax.plot(wealth_history_ts)
-ax.set_title("total wealth")
+alive_per_timestep = summarizer(x)
+ax.plot(alive_per_timestep[1,:])
+ax.set_title("Alive per timestep")
 ax.set_xlabel("timestep")
 fig
 
 ##
 # make a movie with the ts
-function run_and_animate(vision_probs, metabolic_rate_probs)
+function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
     function update_plot(frame)
         frame = frame + 1
         ax.clear()
@@ -73,7 +84,7 @@ function run_and_animate(vision_probs, metabolic_rate_probs)
     end
 
     Random.seed!(1234)
-    sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_probs);
+    sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
     board_history, x_history, y_history, alive_history, occupied_history = abm_run(sugarscape_params)
 
     # Create the figure and axis outside the animation function
@@ -95,4 +106,4 @@ function run_and_animate(vision_probs, metabolic_rate_probs)
     anim.save("sugarscape.gif", writer = "pillow", fps = 10)
     plt.close(fig)
 end
-run_and_animate([0.0, 0.0, 1.0], [0.75, 0.25])
+run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
