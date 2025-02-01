@@ -126,7 +126,7 @@ function RandomAgentInitializer(
 end
 @functor RandomAgentInitializer (vision_distribution_probs, metabolic_rate_bounds, wealth_bounds)
 function get_type(initializer::RandomAgentInitializer)
-    typeof(initializer.vision_distribution_probs[1])
+    promote_type(eltype(initializer.vision_distribution_probs), eltype(initializer.metabolic_rate_bounds), eltype(initializer.wealth_bounds))
 end
 """
 	initialize_agents(initializer::RandomAgentInitializer{T, M, W, U, N, S}, n_agents, diff_type) where {T, M, W, U, N, S}
@@ -174,7 +174,7 @@ function initialize_agents(initializer::RandomAgentInitializer{T,M,W,U,N,S},
             [convert(diff_type, position[1])],
             [convert(diff_type, position[2])],
             [one(diff_type)],
-            [wealth])
+            [convert(diff_type, wealth)])
         push!(agents, agent)
     end
     return agents
@@ -320,7 +320,7 @@ struct SugarScapeParams{T,Q,R,SM}
     gradient_horizon::Int64
     smoothing::SM
 end
-@functor SugarScapeParams (agent_initializer, )
+@functor SugarScapeParams (agent_initializer,)
 
 function reset_gradient!(board, agents, occupied, time, gradient_horizon)
     if time % gradient_horizon == 0
