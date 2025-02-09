@@ -15,6 +15,7 @@ Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
 GraphNeuralNetworks = "cffab07f-9bc2-4db1-8861-388f63bf7694"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 GumbelSoftmax = "f60ed98c-c695-46ff-9817-9af1b038875e"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 LERC_jll = "88015f11-f218-50d7-93a8-a6af411a945d"
@@ -30,6 +31,7 @@ StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+Graphs = "1.12.0"
 Images = "0.26.1"
 julia = "1.10"
 

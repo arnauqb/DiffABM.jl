@@ -1,3 +1,4 @@
+using BenchmarkTools
 using DiffABM
 using Distributions
 using DistributionsAD
@@ -5,6 +6,7 @@ using Flux
 using Images
 using DelimitedFiles
 using PyPlot
+using Profile, PProf
 using Random
 using PyCall
 animation = pyimport("matplotlib.animation")
@@ -12,11 +14,11 @@ animation = pyimport("matplotlib.animation")
 ##
 function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds)
     board_length = 75
-    n_agents = 200
+    n_agents = 100
     n_timesteps = 100
     board = readdlm("scripts/sugar-map.txt")
     board = Images.imresize(board, (board_length, board_length))[:]
-    board = exp.(board ./ 2) # this makes the impact of vision higher.
+    #board = exp.(board ./ 2) # this makes the impact of vision higher.
     board_initializer = GeneratedBoard(board_length, board)
     discrete_sampler = ST()
     neighborhood = VonNeumannNeighborhood()
@@ -39,9 +41,17 @@ vision_probs = [0.2, 0.8]
 metabolic_rate_bounds = [2.0, 5.0] # define a beta distribution
 wealth_bounds = [5.0, 2.0] # define a beta distribution
 sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
-x = abm_run(sugarscape_params);
+Profile.clear()
+#@profile x = abm_run(sugarscape_params);
+@profile begin
+    for i in 1:100
+        x = abm_run(sugarscape_params)
+    end
+end
+pprof()
 # this outputs: board_history, x_history, y_history, wealth_history, alive_history, occupied_history
 # note that these have all the agents!
+##
 function summarizer(x)
     n_timesteps = length(x[5])
     n_agents = length(x[5][1])
@@ -65,6 +75,7 @@ function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
         frame = frame + 1
         ax.clear()
         board = board_history[frame]
+        #board = occupied_history[frame]
         x = x_history[frame]
         y = y_history[frame]
         alive = alive_history[frame]
@@ -83,14 +94,15 @@ function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
         return [im]
     end
 
-    Random.seed!(1234)
+    #Random.seed!(1234)
     sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
-    board_history, x_history, y_history, alive_history, occupied_history = abm_run(sugarscape_params)
+    board_history, x_history, y_history, wealth_history, alive_history, occupied_history = abm_run(sugarscape_params)
 
     # Create the figure and axis outside the animation function
     fig, ax = plt.subplots()
     board = board_history[1]
-    im = ax.pcolormesh(board', cmap = "inferno", vmin = 0, vmax = 5.0)
+    #board = occupied_history[1]
+    im = ax.pcolormesh(board', cmap = "inferno", vmin = 0, vmax = 1.0)
     fig.colorbar(im, ax = ax)
     # Create the animation
     anim = animation.FuncAnimation(

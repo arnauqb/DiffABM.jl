@@ -1,21 +1,19 @@
 export SugarScapeParams, TwoPeakBoard, RandomAgentInitializer, GeneratedAgentInitializer,
-    ConstantAgentInitializer, VonNeumannNeighborhood, MooreNeighborhood, GeneratedBoard
+       ConstantAgentInitializer, VonNeumannNeighborhood, MooreNeighborhood, GeneratedBoard
 
 using Base
 
-struct SugarSeeker{T,V,M}
+@kwdef struct SugarSeeker{T, V, M}
     id::Int64
     vision_matrix::V
     metabolic_rate::M
-    i::Vector{Int64}
-    j::Vector{Int64}
-    x::Vector{T}
-    y::Vector{T}
-    alive::Vector{T}
-    wealth::Vector{T}
+    x::T
+    y::T
+    alive::T
+    wealth::T
 end
-SugarSeeker(; id, vision_matrix, metabolic_rate, i, j, x, y, alive, wealth) =
-    SugarSeeker(id, vision_matrix, metabolic_rate, i, j, x, y, alive, wealth)
+get_i(agent::SugarSeeker) = Int(round(agent.x))
+get_j(agent::SugarSeeker) = Int(round(agent.y))
 
 abstract type BoardInitializer end
 
@@ -26,7 +24,7 @@ end
 get_type(board::GeneratedBoard) = typeof(board.board[1])
 @functor GeneratedBoard (board,)
 
-struct TwoPeakBoard{T,Q} <: BoardInitializer
+struct TwoPeakBoard{T, Q} <: BoardInitializer
     N::Int
     sugar_peaks::Vector{T}
     max_sugar::Vector{Q}
@@ -98,7 +96,7 @@ function generate_vision_matrices(neighborhood::Neighborhood, max_vision)
 end
 get_max_vision(vision_matrix) = (size(vision_matrix, 1) - 2) ÷ 2
 
-struct RandomAgentInitializer{T,M,W,U,N,S} <: AgentInitializer
+struct RandomAgentInitializer{T, M, W, U, N, S} <: AgentInitializer
     vision_distribution_probs::Vector{T}
     metabolic_rate_bounds::Vector{M}
     wealth_bounds::Vector{W}
@@ -107,14 +105,14 @@ struct RandomAgentInitializer{T,M,W,U,N,S} <: AgentInitializer
     discrete_sampler::S
 end
 function RandomAgentInitializer(
-    board_length;
-    vision_distribution_probs,
-    metabolic_rate_bounds,
-    wealth_bounds=[8, 10],
-    position_distribution=Product(DiscreteUniform.(
-        [1, 1], [board_length, board_length])),
-    neighborhood=VonNeumannNeighborhood(),
-    discrete_sampler=ST())
+        board_length;
+        vision_distribution_probs,
+        metabolic_rate_bounds,
+        wealth_bounds = [8, 10],
+        position_distribution = Product(DiscreteUniform.(
+            [1, 1], [board_length, board_length])),
+        neighborhood = VonNeumannNeighborhood(),
+        discrete_sampler = ST())
     return RandomAgentInitializer(
         vision_distribution_probs,
         metabolic_rate_bounds,
@@ -124,9 +122,11 @@ function RandomAgentInitializer(
         discrete_sampler
     )
 end
-@functor RandomAgentInitializer (vision_distribution_probs, metabolic_rate_bounds, wealth_bounds)
+@functor RandomAgentInitializer (
+    vision_distribution_probs, metabolic_rate_bounds, wealth_bounds)
 function get_type(initializer::RandomAgentInitializer)
-    promote_type(eltype(initializer.vision_distribution_probs), eltype(initializer.metabolic_rate_bounds), eltype(initializer.wealth_bounds))
+    promote_type(eltype(initializer.vision_distribution_probs),
+        eltype(initializer.metabolic_rate_bounds), eltype(initializer.wealth_bounds))
 end
 """
 	initialize_agents(initializer::RandomAgentInitializer{T, M, W, U, N, S}, n_agents, diff_type) where {T, M, W, U, N, S}
@@ -141,8 +141,8 @@ Initialize a list of agents for the Sugarscape simulation.
 # Returns
 - A list of `SugarSeeker` agents initialized with random attributes based on the provided distributions.
 """
-function initialize_agents(initializer::RandomAgentInitializer{T,M,W,U,N,S},
-    n_agents, diff_type) where {T,M,W,U,N,S}
+function initialize_agents(initializer::RandomAgentInitializer{T, M, W, U, N, S},
+        n_agents, diff_type) where {T, M, W, U, N, S}
     agents = SugarSeeker[]
     # correct numerical error by renormalizing
     vision_probs = initializer.vision_distribution_probs
@@ -154,33 +154,33 @@ function initialize_agents(initializer::RandomAgentInitializer{T,M,W,U,N,S},
     #end
     vision_probs = vision_probs ./ sum(vision_probs)
     max_vision = length(vision_probs)
-    metabolic_rate_dist = Beta(initializer.metabolic_rate_bounds[1], initializer.metabolic_rate_bounds[2])
+    metabolic_rate_dist = Beta(
+        initializer.metabolic_rate_bounds[1], initializer.metabolic_rate_bounds[2])
     wealth_dist = Beta(initializer.wealth_bounds[1], initializer.wealth_bounds[2])
 
-    vision_matrices = generate_vision_matrices(initializer.neighborhood, 8)
-    vision_matrices = vision_matrices[[1, end]]
+    vision_matrices = generate_vision_matrices(initializer.neighborhood, length(vision_probs))
+    #vision_matrices = vision_matrices[[1, end]]
     for i in 1:n_agents
-        vision_onehot_index = rand(DifferentiableOneHotCategorical(vision_probs, initializer.discrete_sampler))
+        vision_onehot_index = rand(DifferentiableOneHotCategorical(
+            vision_probs, initializer.discrete_sampler))
         vision_matrix = sum(vision_matrices .* vision_onehot_index)
-        metabolic_rate = 3.0 + 2 * rand(metabolic_rate_dist)
+        metabolic_rate = 5 * rand(metabolic_rate_dist) #3.0 + 2 * rand(metabolic_rate_dist)
         wealth = 10 * rand(wealth_dist)
         position = rand(initializer.position_distribution)
         agent = SugarSeeker(
-            i,
-            vision_matrix,
-            metabolic_rate,
-            [position[1]],
-            [position[2]],
-            [convert(diff_type, position[1])],
-            [convert(diff_type, position[2])],
-            [one(diff_type)],
-            [convert(diff_type, wealth)])
+            id = i,
+            vision_matrix = vision_matrix,
+            metabolic_rate = metabolic_rate,
+            x = convert(diff_type, position[1]),
+            y = convert(diff_type, position[2]),
+            alive = one(diff_type),
+            wealth = convert(diff_type, wealth))
         push!(agents, agent)
     end
     return agents
 end
 
-struct GeneratedAgentInitializer{V,M,W,P,S,N} <: AgentInitializer
+struct GeneratedAgentInitializer{V, M, W, P, S, N} <: AgentInitializer
     vision_probabilities::Vector{V}
     metabolic_rates::Vector{M}
     wealths::Vector{W}
@@ -188,11 +188,15 @@ struct GeneratedAgentInitializer{V,M,W,P,S,N} <: AgentInitializer
     discrete_sampler::S
     neighborhood::N
 end
-GeneratedAgentInitializer(; vision_probabilities, metabolic_rates, wealths, positions, discrete_sampler, neighborhood) =
-    GeneratedAgentInitializer(vision_probabilities, metabolic_rates, wealths, positions, discrete_sampler, neighborhood)
+function GeneratedAgentInitializer(; vision_probabilities, metabolic_rates, wealths,
+        positions, discrete_sampler, neighborhood)
+    GeneratedAgentInitializer(vision_probabilities, metabolic_rates, wealths,
+        positions, discrete_sampler, neighborhood)
+end
 @functor GeneratedAgentInitializer (vision_probabilities, metabolic_rates, wealths)
 function get_type(initializer::GeneratedAgentInitializer)
-    promote_type(eltype(initializer.metabolic_rates), eltype(initializer.wealths), eltype(initializer.vision_probabilities))
+    promote_type(eltype(initializer.metabolic_rates), eltype(initializer.wealths),
+        eltype(initializer.vision_probabilities))
 end
 function initialize_agents(initializer::GeneratedAgentInitializer, n_agents, diff_type)
     max_vision = length(initializer.vision_probabilities)
@@ -200,31 +204,30 @@ function initialize_agents(initializer::GeneratedAgentInitializer, n_agents, dif
     vision_probs = initializer.vision_probabilities ./ sum(initializer.vision_probabilities)
     agents = SugarSeeker[]
     for i in 1:n_agents
-        vision_onehot_index = rand(DifferentiableOneHotCategorical(vision_probs, initializer.discrete_sampler))
+        vision_onehot_index = rand(DifferentiableOneHotCategorical(
+            vision_probs, initializer.discrete_sampler))
         vision_matrix = sum(vision_matrices .* vision_onehot_index)
         position = initializer.positions[i]
-        push!(agents, SugarSeeker(
-            id=i,
-            vision_matrix=vision_matrix,
-            metabolic_rate=initializer.metabolic_rates[i],
-            i=[position[1]],
-            j=[position[2]],
-            x=[convert(diff_type, position[1])],
-            y=[convert(diff_type, position[2])],
-            alive=[one(diff_type)],
-            wealth=[convert(diff_type, initializer.wealths[i])]))
+        push!(agents,
+            SugarSeeker(
+                id = i,
+                vision_matrix = vision_matrix,
+                metabolic_rate = initializer.metabolic_rates[i],
+                x = convert(diff_type, position[1]),
+                y = convert(diff_type, position[2]),
+                alive = one(diff_type),
+                wealth = convert(diff_type, initializer.wealths[i])))
     end
     return agents
 end
-
 
 function compute_move(board, agent, occupied)
     scores = eltype(board)[]
     max_vision = get_max_vision(agent.vision_matrix)
     N = size(board, 1)
-    for (vision_i, di) in enumerate(-max_vision:max_vision)
-        for (vision_j, dj) in enumerate(-max_vision:max_vision)
-            i_wrapped, j_wrapped = wrap_index(N, agent.i[1] + di, agent.j[1] + dj)
+    for (vision_i, di) in enumerate((-max_vision):max_vision)
+        for (vision_j, dj) in enumerate((-max_vision):max_vision)
+            i_wrapped, j_wrapped = wrap_index(N, get_i(agent) + di, get_j(agent) + dj)
             score = board[i_wrapped, j_wrapped] *
                     (1.0 - occupied[i_wrapped, j_wrapped]) *
                     agent.vision_matrix[vision_i, vision_j]
@@ -235,52 +238,57 @@ function compute_move(board, agent, occupied)
     return move_onehot
 end
 
-function move!(board, agent, move_onehot, occupied)
+function compute_new_position(board, agent, move_onehot, occupied)
     # reset agent position
-    agent.x[1] = zero(agent.x[1])
-    agent.y[1] = zero(agent.y[1])
-    occupied[agent.i[1], agent.j[1]] = 0.0
+    new_x = zero(agent.x)
+    new_y = zero(agent.y)
+    i_wrapped, j_wrapped = wrap_index(size(board, 1), get_i(agent), get_j(agent))
+    occupied[i_wrapped, j_wrapped] = 0.0
     # iterate through all possible moves and assign
     N = size(board, 1)
     max_vision = get_max_vision(agent.vision_matrix)
     move_onehot_index = 1
     for di in (-max_vision):max_vision
         for dj in (-max_vision):max_vision
-            i_wrapped, j_wrapped = wrap_index(N, agent.i[1] + di, agent.j[1] + dj)
-            agent.x[1] += i_wrapped * move_onehot[move_onehot_index] * agent.alive[1]
-            agent.y[1] += j_wrapped * move_onehot[move_onehot_index] * agent.alive[1]
-            occupied[i_wrapped, j_wrapped] += move_onehot[move_onehot_index] *
-                                              agent.alive[1]
+            i_wrapped, j_wrapped = wrap_index(N, get_i(agent) + di, get_j(agent) + dj)
+            new_x += i_wrapped * move_onehot[move_onehot_index] * agent.alive
+            new_y += j_wrapped * move_onehot[move_onehot_index] * agent.alive
+            occupied[i_wrapped, j_wrapped] += move_onehot[move_onehot_index] * agent.alive
             move_onehot_index += 1
         end
     end
+    return new_x, new_y
 end
 
-function consume!(board, agent, move_onehot)
+function compute_new_wealth(board, agent, move_onehot)
     # iterate and sum possible wealths
     N = size(board, 1)
     max_vision = get_max_vision(agent.vision_matrix)
     move_onehot_index = 1
+    new_wealth = agent.wealth
     for di in (-max_vision):max_vision
         for dj in (-max_vision):max_vision
-            i_wrapped, j_wrapped = wrap_index(N, agent.i[1] + di, agent.j[1] + dj)
-            agent.wealth[1] += board[i_wrapped, j_wrapped] *
-                               move_onehot[move_onehot_index] * agent.alive[1]
+            i_wrapped, j_wrapped = wrap_index(N, get_i(agent) + di, get_j(agent) + dj)
+            new_wealth += board[i_wrapped, j_wrapped] *
+                          move_onehot[move_onehot_index] * agent.alive
             board[i_wrapped, j_wrapped] *= (1.0 -
-                                            move_onehot[move_onehot_index] * agent.alive[1])
+                                            move_onehot[move_onehot_index] * agent.alive)
             move_onehot_index += 1
         end
     end
     # consume sugar
-    agent.wealth[1] -= agent.metabolic_rate[1] * agent.alive[1]
+    new_wealth -= agent.metabolic_rate * agent.alive
+    return new_wealth
 end
 
-function check_death!(agent, occupied, smoothing)
+function compute_alive(agent, occupied, smoothing)
     soft = smoothing(agent.wealth[1])
     hard = ignore_gradient(agent.wealth[1]) >= 0.0
     lives = hard + (soft - ignore_gradient(soft))
-    agent.alive[1] = agent.alive[1] * lives
-    occupied[agent.i[1], agent.j[1]] = agent.alive[1]
+    new_alive = agent.alive * lives
+    i_wrapped, j_wrapped = wrap_index(size(occupied, 1), get_i(agent), get_j(agent))
+    occupied[i_wrapped, j_wrapped] = new_alive
+    return new_alive
 end
 
 function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
@@ -298,19 +306,28 @@ function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 end
 
 function sugarscape_abm_step!(
-    board, agents, occupied, sugar_regeneration_rate, max_sugar_capacities, smoothing)
-    order = sample(1:length(agents), length(agents), replace=false)
+        board, agents, occupied, sugar_regeneration_rate, max_sugar_capacities, smoothing)
+    order = sample(1:length(agents), length(agents), replace = false)
     for idx in order
         agent = agents[idx]
         move_onehot = compute_move(board, agent, occupied)
-        move!(board, agent, move_onehot, occupied)
-        consume!(board, agent, move_onehot)
-        check_death!(agent, occupied, smoothing)
+        new_x, new_y = compute_new_position(board, agent, move_onehot, occupied)
+        new_wealth = compute_new_wealth(board, agent, move_onehot)
+        new_alive = compute_alive(agent, occupied, smoothing)
+        agents[idx] = SugarSeeker(
+            id = agent.id,
+            vision_matrix = agent.vision_matrix,
+            metabolic_rate = agent.metabolic_rate,
+            x = new_x,
+            y = new_y,
+            alive = new_alive,
+            wealth = new_wealth
+        )
     end
     regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 end
 
-struct SugarScapeParams{T,Q,R,SM}
+struct SugarScapeParams{T, Q, R, SM}
     board_initializer::T
     agent_initializer::Q
     board_length::Int64
@@ -326,11 +343,16 @@ function reset_gradient!(board, agents, occupied, time, gradient_horizon)
     if time % gradient_horizon == 0
         board .= ignore_gradient.(board)
         occupied .= ignore_gradient.(occupied)
-        for agent in agents
-            agent.x[1] = ignore_gradient(agent.x[1])
-            agent.y[1] = ignore_gradient(agent.y[1])
-            agent.wealth[1] = ignore_gradient(agent.wealth[1])
-            agent.alive[1] = ignore_gradient(agent.alive[1])
+        for idx in 1:length(agents)
+            agents[idx] = SugarSeeker(
+                id = agents[idx].id,
+                vision_matrix = agents[idx].vision_matrix,
+                metabolic_rate = agents[idx].metabolic_rate,
+                x = ignore_gradient(agents[idx].x),
+                y = ignore_gradient(agents[idx].y),
+                alive = ignore_gradient(agents[idx].alive),
+                wealth = ignore_gradient(agents[idx].wealth)
+                )
         end
     end
 end
@@ -342,13 +364,13 @@ function abm_run(params::SugarScapeParams)
     agents = initialize_agents(params.agent_initializer, params.n_agents, diff_type)
     occupied = zeros(diff_type, params.board_length, params.board_length)
     for agent in agents
-        occupied[agent.i[1], agent.j[1]] = 1.0
+        occupied[get_i(agent), get_j(agent)] = 1.0
     end
     board_history = [copy(board)]
-    x_history = [[agent.x[1] for agent in agents]]
-    y_history = [[agent.y[1] for agent in agents]]
-    wealth_history = [[agent.wealth[1] for agent in agents]]
-    alive_history = [[agent.alive[1] for agent in agents]]
+    x_history = [[agent.x for agent in agents]]
+    y_history = [[agent.y for agent in agents]]
+    wealth_history = [[agent.wealth for agent in agents]]
+    alive_history = [[agent.alive for agent in agents]]
     occupied_history = [copy(occupied)]
     max_sugar_capacities = copy(board)
     for t in 2:(params.n_timesteps)
@@ -356,10 +378,10 @@ function abm_run(params::SugarScapeParams)
         sugarscape_abm_step!(board, agents, occupied, params.sugar_regeneration_rate,
             max_sugar_capacities, params.smoothing)
         push!(board_history, copy(board))
-        push!(x_history, [agent.x[1] for agent in agents])
-        push!(y_history, [agent.y[1] for agent in agents])
-        push!(wealth_history, [agent.wealth[1] for agent in agents])
-        push!(alive_history, [agent.alive[1] for agent in agents])
+        push!(x_history, [agent.x for agent in agents])
+        push!(y_history, [agent.y for agent in agents])
+        push!(wealth_history, [agent.wealth for agent in agents])
+        push!(alive_history, [agent.alive for agent in agents])
         push!(occupied_history, copy(occupied))
     end
     return board_history, x_history, y_history, wealth_history, alive_history,

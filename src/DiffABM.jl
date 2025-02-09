@@ -34,9 +34,10 @@ include("discrete_randomness.jl")
 include("BrockHommes.jl")
 include("GameOfLife.jl")
 include("RandomWalk.jl")
-include("SIR/sir.jl")
+#include("SIR/sir.jl")
 include("SugarScape.jl")
 include("AxtellFirms/AxtellFirms.jl")
+include("sir_simple.jl")
 #include("AxtellFirms/AxtellFirmsVectorized.jl")
 
 end

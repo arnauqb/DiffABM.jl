@@ -76,9 +76,9 @@ end
 function (p::Quarantine)(sampler, transmission, time)
 	active = is_active(time, p.start_time[1], p.end_time[1])
 	quarantine_probs = ones(length(transmission)) .* p.p[1]
-	#does_quarantine = sample_bernoulli(sampler, quarantine_probs)
+	does_quarantine = sample_bernoulli(sampler, quarantine_probs)
 	#return @. transmission * (mask * does_quarantine + (1.0 - mask))
-	return @. transmission * (active * (1.0 - quarantine_probs) + (1.0 - active))
+	return @. transmission * (active * (1.0 - does_quarantine) + (1.0 - active))
 end
 
 function (p::QuarantinePolicies)(sampler, transmission, time)
