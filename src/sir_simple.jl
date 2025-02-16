@@ -13,6 +13,7 @@ struct SocialDistancing{T, V}
     end_time::Vector{V}
     alpha::Vector{T}  # reduction in transmission
 end
+SocialDistancing() = SocialDistancing(Float64[0.0], Float64[Inf], Float64[1.0])
 @functor SocialDistancing (start_time, end_time, alpha)
 
 struct Quarantine{T, V}
@@ -20,6 +21,7 @@ struct Quarantine{T, V}
     end_time::Vector{V}
     p::Vector{T}  # probability of quarantine
 end
+Quarantine() = Quarantine(Float64[0.0], Float64[Inf], Float64[0.0])
 @functor Quarantine (start_time, end_time, p)
 
 struct Policies{SD, Q}
@@ -31,7 +33,7 @@ end
 # Helper function for policy activation
 function is_active(time, start_time, end_time)
     hard = time >= start_time && time < end_time
-    smoothing = GaussianSmoothing(1.0)
+    smoothing = GaussianSmoothing(0.1)
     soft = smoothing(time - start_time) * smoothing(end_time - time)
     return hard + (soft - ignore_gradient.(soft))
 end
@@ -97,12 +99,14 @@ function compute_transmission(
     transmission = policies.quarantine(sampler, I, time)
     # Compute infection spread
     transmission = propagate_infection(graph, policies, beta, transmission, time)
-    transmission = @. S * (1.0 - exp(-transmission * delta_t))
+    #transmission = @. S * (1.0 - exp(-transmission * delta_t))
+    transmission = @. 1.0 - exp(-transmission * delta_t)
     return clamp.(transmission, 0.0, 1.0)
 end
 
 function compute_recovery(I, gamma, delta_t)
-    recovery = I .* (1.0 - exp(-gamma * delta_t))
+    #recovery = I .* (1.0 - exp(-gamma * delta_t))
+    recovery = ones(length(I)) .* (1.0 - exp(-gamma * delta_t))
     return clamp.(recovery, 0.0, 1.0)
 end
 
@@ -111,9 +115,9 @@ function sir_step(graph, S, I, R, beta, gamma, time, delta_t,
     transmission = compute_transmission(
         graph, sampler, policies, beta[1], S, I, time, delta_t)
 
-    delta_I = sample_bernoulli(sampler, transmission)
+    delta_I = S .* sample_bernoulli(sampler, transmission)
     recovery = compute_recovery(I, gamma[1], delta_t)
-    delta_R = sample_bernoulli(sampler, recovery)
+    delta_R = I .* sample_bernoulli(sampler, recovery)
 
     S = S - delta_I
     I = I + delta_I - delta_R
