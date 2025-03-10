@@ -94,7 +94,7 @@ function generate_vision_matrices(neighborhood::Neighborhood, max_vision)
     end
     return vision_matrices
 end
-get_max_vision(vision_matrix) = (size(vision_matrix, 1) - 2) ÷ 2
+get_max_vision(vision_matrix) = (size(vision_matrix, 1) - 1) ÷ 2
 
 struct RandomAgentInitializer{T, M, W, U, N, S} <: AgentInitializer
     vision_distribution_probs::Vector{T}
@@ -146,25 +146,19 @@ function initialize_agents(initializer::RandomAgentInitializer{T, M, W, U, N, S}
     agents = SugarSeeker[]
     # correct numerical error by renormalizing
     vision_probs = initializer.vision_distribution_probs
-    # try to enlarge
-    #vision_probs = sigmoid.(5 * (vision_probs .- 0.5))
-    #k = 5
-    #if ignore_gradient.(vision_probs) != [0.9, 0.1]
-    #    vision_probs = sigmoid.(k * (vision_probs .- [0.9, 0.1]))
-    #end
     vision_probs = vision_probs ./ sum(vision_probs)
-    max_vision = length(vision_probs)
     metabolic_rate_dist = Beta(
         initializer.metabolic_rate_bounds[1], initializer.metabolic_rate_bounds[2])
     wealth_dist = Beta(initializer.wealth_bounds[1], initializer.wealth_bounds[2])
-
-    vision_matrices = generate_vision_matrices(initializer.neighborhood, length(vision_probs))
-    #vision_matrices = vision_matrices[[1, end]]
+    probs_metabolic_rate = 0.25 .* ones(4, 1)
+    vision_matrices = generate_vision_matrices(
+        initializer.neighborhood, length(vision_probs))
     for i in 1:n_agents
         vision_onehot_index = rand(DifferentiableOneHotCategorical(
             vision_probs, initializer.discrete_sampler))
         vision_matrix = sum(vision_matrices .* vision_onehot_index)
-        metabolic_rate = 5 * rand(metabolic_rate_dist) #3.0 + 2 * rand(metabolic_rate_dist)
+        metabolic_rate = sample_categorical(
+            initializer.discrete_sampler, probs_metabolic_rate)[1] #4 * rand(metabolic_rate_dist)
         wealth = 10 * rand(wealth_dist)
         position = rand(initializer.position_distribution)
         agent = SugarSeeker(
@@ -286,8 +280,6 @@ function compute_alive(agent, occupied, smoothing)
     hard = ignore_gradient(agent.wealth[1]) >= 0.0
     lives = hard + (soft - ignore_gradient(soft))
     new_alive = agent.alive * lives
-    i_wrapped, j_wrapped = wrap_index(size(occupied, 1), get_i(agent), get_j(agent))
-    occupied[i_wrapped, j_wrapped] = new_alive
     return new_alive
 end
 
@@ -295,12 +287,6 @@ function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
     for i in axes(board, 1)
         for j in axes(board, 2)
             board[i, j] = min(board[i, j] + 1.0, max_sugar_capacities[i, j])
-            #if rand() < 0.01
-            #    board[i, j] += 10.0
-            #end
-            #else
-            #    board[i, j] = 0.0
-            #end
         end
     end
 end
@@ -352,7 +338,7 @@ function reset_gradient!(board, agents, occupied, time, gradient_horizon)
                 y = ignore_gradient(agents[idx].y),
                 alive = ignore_gradient(agents[idx].alive),
                 wealth = ignore_gradient(agents[idx].wealth)
-                )
+            )
         end
     end
 end

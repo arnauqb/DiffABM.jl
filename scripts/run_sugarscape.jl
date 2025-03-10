@@ -16,11 +16,10 @@ function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_boun
     board_length = 75
     n_agents = 100
     n_timesteps = 100
-    board = readdlm("scripts/sugar-map.txt")
+    board = readdlm("scripts/sugar-map.txt")[:]
     board = Images.imresize(board, (board_length, board_length))[:]
-    #board = exp.(board ./ 2) # this makes the impact of vision higher.
     board_initializer = GeneratedBoard(board_length, board)
-    discrete_sampler = ST()
+    discrete_sampler = SM()
     neighborhood = VonNeumannNeighborhood()
     sugar_regeneration_rate = 1.0
     gradient_horizon = 10000
@@ -37,18 +36,10 @@ function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_boun
         n_agents, n_timesteps, [sugar_regeneration_rate], gradient_horizon, smoothing)
     return sugarscape
 end
-vision_probs = [0.2, 0.8]
+vision_probs = ones(6) ./ 6 #[0.2, 0.2, 0.2, 0.2, 0.2]
 metabolic_rate_bounds = [2.0, 5.0] # define a beta distribution
 wealth_bounds = [5.0, 2.0] # define a beta distribution
 sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
-Profile.clear()
-#@profile x = abm_run(sugarscape_params);
-@profile begin
-    for i in 1:100
-        x = abm_run(sugarscape_params)
-    end
-end
-pprof()
 # this outputs: board_history, x_history, y_history, wealth_history, alive_history, occupied_history
 # note that these have all the agents!
 ##
@@ -60,13 +51,8 @@ function summarizer(x)
 end
 
 ##
-fig, ax = plt.subplots()
-# plot total wealth history
-alive_per_timestep = summarizer(x)
-ax.plot(alive_per_timestep[1,:])
-ax.set_title("Alive per timestep")
-ax.set_xlabel("timestep")
-fig
+params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
+board_history, x_history, y_history, wealth_history, alive_history, occupied_history = abm_run(params);
 
 ##
 # make a movie with the ts
@@ -81,7 +67,7 @@ function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
         alive = alive_history[frame]
 
         # Use pcolormesh with plasma colormap
-        im = ax.pcolormesh(board', cmap = "inferno", vmin = 0, vmax = 5.0)
+        im = ax.pcolormesh(board', cmap = "inferno")#, vmin = 0, vmax = 5.0)
         #fig.colorbar(im, ax=ax)
 
         # Scatter plot with white color for alive and black for dead
@@ -102,7 +88,7 @@ function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
     fig, ax = plt.subplots()
     board = board_history[1]
     #board = occupied_history[1]
-    im = ax.pcolormesh(board', cmap = "inferno", vmin = 0, vmax = 1.0)
+    im = ax.pcolormesh(board', cmap = "inferno")#, vmin = 0, vmax = 1.0)
     fig.colorbar(im, ax = ax)
     # Create the animation
     anim = animation.FuncAnimation(

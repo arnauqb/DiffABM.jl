@@ -27,8 +27,7 @@ function sample_categorical(::Union{SAD,SM}, probs)
 end
 
 function sample_categorical(::ST, probs)
-    res = [rand(Distributions.Categorical(probs[:, i])) for i in axes(probs, 2)]
-    return ignore_gradient(res) + (probs - ignore_gradient(probs))
+    throw("Not implemented")
 end
 
 function sample_categorical(categorical_sampler::GS, probs)

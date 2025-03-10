@@ -103,15 +103,15 @@ function random_argmax(array)
 end
 function differentiable_argmax(array::Vector{<:StochasticAD.StochasticTriple})
     # shift by maximum to avoid overflow
-    soft = my_softmax(array .- maximum(array) + rand(length(array)) * 1e-6)
-    hard = argmax(ignore_gradient.(array)) #random_argmax(ignore_gradient.(array))
+    soft = my_softmax(array .- maximum(array))
+    hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
 end
 function differentiable_argmax(array)
     # shift by maximum to avoid overflow and perturbate to avoid ties
-    soft = Flux.softmax(array .- maximum(array) + rand(length(array)) * 1e-6)
-    hard = argmax(ignore_gradient.(array)) #random_argmax(ignore_gradient.(array))
+    soft = Flux.softmax(array .- maximum(array))
+    hard = random_argmax(ignore_gradient.(array))
     hard_onehot = Flux.onehot(hard, 1:length(array))
     return hard_onehot + (soft - ignore_gradient.(soft))
 end
