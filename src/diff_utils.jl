@@ -1,5 +1,5 @@
 export SigmoidSmoothing, GaussianSmoothing, PiecewiseSmoothing, StraightThroughSmoothing,
-       TwoPiecewiseSmoothing
+       TwoPiecewiseSmoothing, DiffBeta
 ignore_gradient(x) = ChainRulesCore.ignore_derivatives(x)
 ignore_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
 ignore_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
@@ -233,3 +233,17 @@ function kde(samples, evaluation_points; bandwidth=nothing)
 end
 
 Base.isinteger(x::Real, tol::Float64) = abs(round(x) - x) < tol
+
+struct DiffBeta{T} <: Distributions.ContinuousUnivariateDistribution
+    alpha::T
+    beta::T
+end
+function Distributions.rand(rng::AbstractRNG, dist::DiffBeta{T}, n_samples::Int64) where {T}
+    # sample from Kumaraswamy distribution as a quick diff approximation
+    u = rand(rng, n_samples)
+    return (1 .- u .^ (1 / dist.beta)) .^ (1 / dist.alpha)
+end
+function Distributions.rand(rng::AbstractRNG, dist::DiffBeta{T}) where {T}
+    u = rand(rng)
+    return (1 .- u .^ (1 / dist.beta)) .^ (1 / dist.alpha)
+end

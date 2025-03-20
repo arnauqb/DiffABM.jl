@@ -1,9 +1,9 @@
 export SugarScapeParams, TwoPeakBoard, RandomAgentInitializer, GeneratedAgentInitializer,
-       ConstantAgentInitializer, VonNeumannNeighborhood, MooreNeighborhood, GeneratedBoard
+    ConstantAgentInitializer, VonNeumannNeighborhood, MooreNeighborhood, GeneratedBoard
 
 using Base
 
-@kwdef struct SugarSeeker{T, V, M}
+@kwdef struct SugarSeeker{T,V,M}
     id::Int64
     vision_matrix::V
     metabolic_rate::M
@@ -12,8 +12,8 @@ using Base
     alive::T
     wealth::T
 end
-get_i(agent::SugarSeeker) = Int(round(agent.x))
-get_j(agent::SugarSeeker) = Int(round(agent.y))
+get_i(agent::SugarSeeker) = Int(round(ignore_gradient(agent.x)))
+get_j(agent::SugarSeeker) = Int(round(ignore_gradient(agent.y)))
 
 abstract type BoardInitializer end
 
@@ -24,7 +24,7 @@ end
 get_type(board::GeneratedBoard) = typeof(board.board[1])
 @functor GeneratedBoard (board,)
 
-struct TwoPeakBoard{T, Q} <: BoardInitializer
+struct TwoPeakBoard{T,Q} <: BoardInitializer
     N::Int
     sugar_peaks::Vector{T}
     max_sugar::Vector{Q}
@@ -96,7 +96,7 @@ function generate_vision_matrices(neighborhood::Neighborhood, max_vision)
 end
 get_max_vision(vision_matrix) = (size(vision_matrix, 1) - 1) ÷ 2
 
-struct RandomAgentInitializer{T, M, W, U, N, S} <: AgentInitializer
+struct RandomAgentInitializer{T,M,W,U,N,S} <: AgentInitializer
     vision_distribution_probs::Vector{T}
     metabolic_rate_bounds::Vector{M}
     wealth_bounds::Vector{W}
@@ -105,14 +105,14 @@ struct RandomAgentInitializer{T, M, W, U, N, S} <: AgentInitializer
     discrete_sampler::S
 end
 function RandomAgentInitializer(
-        board_length;
-        vision_distribution_probs,
-        metabolic_rate_bounds,
-        wealth_bounds = [8, 10],
-        position_distribution = Product(DiscreteUniform.(
-            [1, 1], [board_length, board_length])),
-        neighborhood = VonNeumannNeighborhood(),
-        discrete_sampler = ST())
+    board_length;
+    vision_distribution_probs,
+    metabolic_rate_bounds,
+    wealth_bounds=[8, 10],
+    position_distribution=Product(DiscreteUniform.(
+        [1, 1], [board_length, board_length])),
+    neighborhood=VonNeumannNeighborhood(),
+    discrete_sampler=ST())
     return RandomAgentInitializer(
         vision_distribution_probs,
         metabolic_rate_bounds,
@@ -141,40 +141,40 @@ Initialize a list of agents for the Sugarscape simulation.
 # Returns
 - A list of `SugarSeeker` agents initialized with random attributes based on the provided distributions.
 """
-function initialize_agents(initializer::RandomAgentInitializer{T, M, W, U, N, S},
-        n_agents, diff_type) where {T, M, W, U, N, S}
+function initialize_agents(initializer::RandomAgentInitializer{T,M,W,U,N,S},
+    n_agents, diff_type) where {T,M,W,U,N,S}
     agents = SugarSeeker[]
     # correct numerical error by renormalizing
+    #vision_probs = initializer.vision_distribution_probs
+    #vision_probs = vision_probs ./ sum(vision_probs)
+    #vision_probs = vcat(initializer.vision_distribution_probs, 1.0 - sum(initializer.vision_distribution_probs))
     vision_probs = initializer.vision_distribution_probs
-    vision_probs = vision_probs ./ sum(vision_probs)
-    metabolic_rate_dist = Beta(
+    metabolic_rate_dist = DiffBeta(
         initializer.metabolic_rate_bounds[1], initializer.metabolic_rate_bounds[2])
-    wealth_dist = Beta(initializer.wealth_bounds[1], initializer.wealth_bounds[2])
-    probs_metabolic_rate = 0.25 .* ones(4, 1)
+    wealth_dist = DiffBeta(initializer.wealth_bounds[1], initializer.wealth_bounds[2])
     vision_matrices = generate_vision_matrices(
         initializer.neighborhood, length(vision_probs))
     for i in 1:n_agents
         vision_onehot_index = rand(DifferentiableOneHotCategorical(
             vision_probs, initializer.discrete_sampler))
         vision_matrix = sum(vision_matrices .* vision_onehot_index)
-        metabolic_rate = sample_categorical(
-            initializer.discrete_sampler, probs_metabolic_rate)[1] #4 * rand(metabolic_rate_dist)
+        metabolic_rate = 2.0 + 2 * rand(metabolic_rate_dist)
         wealth = 10 * rand(wealth_dist)
         position = rand(initializer.position_distribution)
         agent = SugarSeeker(
-            id = i,
-            vision_matrix = vision_matrix,
-            metabolic_rate = metabolic_rate,
-            x = convert(diff_type, position[1]),
-            y = convert(diff_type, position[2]),
-            alive = one(diff_type),
-            wealth = convert(diff_type, wealth))
+            id=i,
+            vision_matrix=vision_matrix,
+            metabolic_rate=metabolic_rate,
+            x=convert(diff_type, position[1]),
+            y=convert(diff_type, position[2]),
+            alive=one(diff_type),
+            wealth=convert(diff_type, wealth))
         push!(agents, agent)
     end
     return agents
 end
 
-struct GeneratedAgentInitializer{V, M, W, P, S, N} <: AgentInitializer
+struct GeneratedAgentInitializer{V,M,W,P,S,N} <: AgentInitializer
     vision_probabilities::Vector{V}
     metabolic_rates::Vector{M}
     wealths::Vector{W}
@@ -183,7 +183,7 @@ struct GeneratedAgentInitializer{V, M, W, P, S, N} <: AgentInitializer
     neighborhood::N
 end
 function GeneratedAgentInitializer(; vision_probabilities, metabolic_rates, wealths,
-        positions, discrete_sampler, neighborhood)
+    positions, discrete_sampler, neighborhood)
     GeneratedAgentInitializer(vision_probabilities, metabolic_rates, wealths,
         positions, discrete_sampler, neighborhood)
 end
@@ -204,13 +204,13 @@ function initialize_agents(initializer::GeneratedAgentInitializer, n_agents, dif
         position = initializer.positions[i]
         push!(agents,
             SugarSeeker(
-                id = i,
-                vision_matrix = vision_matrix,
-                metabolic_rate = initializer.metabolic_rates[i],
-                x = convert(diff_type, position[1]),
-                y = convert(diff_type, position[2]),
-                alive = one(diff_type),
-                wealth = convert(diff_type, initializer.wealths[i])))
+                id=i,
+                vision_matrix=vision_matrix,
+                metabolic_rate=initializer.metabolic_rates[i],
+                x=convert(diff_type, position[1]),
+                y=convert(diff_type, position[2]),
+                alive=one(diff_type),
+                wealth=convert(diff_type, initializer.wealths[i])))
     end
     return agents
 end
@@ -292,8 +292,8 @@ function regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 end
 
 function sugarscape_abm_step!(
-        board, agents, occupied, sugar_regeneration_rate, max_sugar_capacities, smoothing)
-    order = sample(1:length(agents), length(agents), replace = false)
+    board, agents, occupied, sugar_regeneration_rate, max_sugar_capacities, smoothing)
+    order = sample(1:length(agents), length(agents), replace=false)
     for idx in order
         agent = agents[idx]
         move_onehot = compute_move(board, agent, occupied)
@@ -301,19 +301,19 @@ function sugarscape_abm_step!(
         new_wealth = compute_new_wealth(board, agent, move_onehot)
         new_alive = compute_alive(agent, occupied, smoothing)
         agents[idx] = SugarSeeker(
-            id = agent.id,
-            vision_matrix = agent.vision_matrix,
-            metabolic_rate = agent.metabolic_rate,
-            x = new_x,
-            y = new_y,
-            alive = new_alive,
-            wealth = new_wealth
+            id=agent.id,
+            vision_matrix=agent.vision_matrix,
+            metabolic_rate=agent.metabolic_rate,
+            x=new_x,
+            y=new_y,
+            alive=new_alive,
+            wealth=new_wealth
         )
     end
     regenerate_sugar!(board, sugar_regeneration_rate, max_sugar_capacities)
 end
 
-struct SugarScapeParams{T, Q, R, SM}
+struct SugarScapeParams{T,Q,R,SM}
     board_initializer::T
     agent_initializer::Q
     board_length::Int64
@@ -331,13 +331,13 @@ function reset_gradient!(board, agents, occupied, time, gradient_horizon)
         occupied .= ignore_gradient.(occupied)
         for idx in 1:length(agents)
             agents[idx] = SugarSeeker(
-                id = agents[idx].id,
-                vision_matrix = agents[idx].vision_matrix,
-                metabolic_rate = agents[idx].metabolic_rate,
-                x = ignore_gradient(agents[idx].x),
-                y = ignore_gradient(agents[idx].y),
-                alive = ignore_gradient(agents[idx].alive),
-                wealth = ignore_gradient(agents[idx].wealth)
+                id=agents[idx].id,
+                vision_matrix=agents[idx].vision_matrix,
+                metabolic_rate=agents[idx].metabolic_rate,
+                x=ignore_gradient(agents[idx].x),
+                y=ignore_gradient(agents[idx].y),
+                alive=ignore_gradient(agents[idx].alive),
+                wealth=ignore_gradient(agents[idx].wealth)
             )
         end
     end

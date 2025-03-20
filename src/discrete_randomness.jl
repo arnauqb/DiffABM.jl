@@ -16,7 +16,7 @@ end
 struct SAD{T} <: DiscreteSampler
     derivative_coupling::T
 end
-SAD() = SAD(StochasticAD.InversionMethodDerivativeCoupling())
+SAD() = SAD(nothing)
 # StochasticAD with smoothing
 struct SM <: DiscreteSampler end
 # Straight-Through
@@ -89,38 +89,44 @@ function Distributions.logpdf(d::DifferentiableBernoulli, x)
     return logpdf(Bernoulli(d.p), x)
 end
 
-struct DifferentiableOneHotCategorical{T, R} <: Distributions.DiscreteMultivariateDistribution
+"""
+One-hot categorical distribution with differentiable sampling. For each gradient estimator,
+we need to define a different transformation for the gradient passs. This is because while
+the Straight-Through and Gumbel-Softmax estimators naturally output a one-hot vector,
+StochasticAD returns an index which needs to be converted to a one-hot vector in a differentiable way.
+"""
+struct DifferentiableOneHotCategorical{T,R} <: Distributions.DiscreteMultivariateDistribution
     probs::Vector{T}
     rep_method::R
 end
 Base.length(d::DifferentiableOneHotCategorical) = length(d.probs)
-function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T, R}) where {T, R<:Union{SM,SAD}}
+function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:Union{SM}}
     probs = d.probs ./ sum(d.probs)
     index = rand(Categorical(probs))
     index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(d.probs))
     positions = 1:length(d.probs)
-    distances_squared = (positions .- index) .^ 2
-    index_onehot_soft = my_softmax(distances_squared)
+    distances = abs.(positions .- index)
+    k = 1.0
+    index_onehot_soft = my_softmax(k .* distances)
     index_onehot = index_onehot_hard + (index_onehot_soft - ignore_gradient.(index_onehot_soft))
     return index_onehot
 end
-function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T, R}) where {T, R<:Union{GS,RGS}}
-    probs = [d.probs 1.0 .- d.probs]
-    return sample_gumbel_softmax(probs=probs, tau=d.rep_method.tau, epsilon=1e-8)[:, 1]
+function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:SAD}
+    probs = d.probs ./ sum(d.probs)
+    index = rand(Categorical(probs))
+    onehot_matrix = Diagonal(ones(length(d.probs)))
+    return onehot_matrix[index, :]
 end
-function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T, R}) where {T, R<:ST}
-    index = rand(Categorical(ignore_gradient.(d.probs)))
-    index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(d.probs))
-    return index_onehot_hard + (d.probs - ignore_gradient.(d.probs))
+function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:Union{GS,RGS}}
+    probs = reshape(d.probs, 1, :)
+    return sample_gumbel_softmax(probs=probs, tau=d.rep_method.tau, epsilon=1e-8)[1, :]
 end
-function Distributions.rand!(rng::AbstractRNG, d::DifferentiableOneHotCategorical, x::AbstractArray{<:Real, M}) where {M}
+function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:ST}
+    probs = d.probs ./ sum(d.probs)
+    index = rand(Categorical(ignore_gradient.(probs)))
+    index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(probs))
+    return index_onehot_hard + (probs - ignore_gradient.(probs))
+end
+function Distributions.rand!(rng::AbstractRNG, d::DifferentiableOneHotCategorical, x::AbstractArray{<:Real,M}) where {M}
     x .= rand(rng, d)
 end
-function Distributions.logpdf(d::DifferentiableOneHotCategorical, x::AbstractArray{<:Real, M}) where {M}
-    index = argmax(x)
-    asd = logpdf(Categorical(d.probs), index)
-    println(asd)
-    return asd
-end
-
-

@@ -15,6 +15,9 @@ makedocs(;
     pages=[
         "Home" => "index.md",
     ],
+    format=MarkdownVitePress(
+        repo="https://github.com/arnauqb/DiffABM.jl",
+    )
 )
 
 deploydocs(;

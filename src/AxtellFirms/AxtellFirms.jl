@@ -16,19 +16,6 @@ struct Firm{T}
     b::T
 end
 
-struct DiffBeta{T} <: Distributions.ContinuousUnivariateDistribution
-    alpha::T
-    beta::T
-end
-function Distributions.rand(rng::AbstractRNG, dist::DiffBeta{T}, n_samples::Int64) where {T}
-    # sample from Kumaraswamy distribution as a quick diff approximation
-    u = rand(rng, n_samples)
-    return (1 .- u .^ (1 / dist.beta)) .^ (1 / dist.alpha)
-end
-function Distributions.rand(rng::AbstractRNG, dist::DiffBeta{T}) where {T}
-    u = rand(rng)
-    return (1 .- u .^ (1 / dist.beta)) .^ (1 / dist.alpha)
-end
 
 abstract type UtilityFunction end
 

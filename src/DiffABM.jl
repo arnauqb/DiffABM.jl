@@ -6,6 +6,7 @@ using DiffResults
 using Distributions
 using DistributionsAD
 using DataStructures
+using DispatchDoctor
 using ForwardDiff
 using Functors
 using Flux
@@ -38,6 +39,7 @@ include("RandomWalk.jl")
 include("SugarScape.jl")
 include("AxtellFirms/AxtellFirms.jl")
 include("sir_simple.jl")
+#include("sir_simple_vec.jl")
 #include("AxtellFirms/AxtellFirmsVectorized.jl")
 
 end
