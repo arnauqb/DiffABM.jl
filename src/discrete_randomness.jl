@@ -30,30 +30,40 @@ function sample_categorical(::ST, probs)
     throw("Not implemented")
 end
 
-function sample_categorical(categorical_sampler::GS, probs)
+
+function sample_categorical(categorical_sampler::GS, probs::AbstractVector)
     categories = collect(1:size(probs, 2))
     one_hot = sample_gumbel_softmax(probs=probs, tau=categorical_sampler.tau)
     return sum(one_hot .* categories', dims=2)
 end
 
-function sample_bernoulli(::Union{SAD,SM}, probs)
-    return [rand(Distributions.Bernoulli(p)) for p in probs]
+function sample_bernoulli(::Union{SAD, SM}, p::Real)
+    return rand(Distributions.Bernoulli(p))
 end
 
-function sample_bernoulli(bernoulli_sampler::GS, probs)
+function sample_bernoulli(::Union{SAD,SM}, probs::AbstractVector)
+    return sample_bernoulli.(Ref(categorical_sampler), probs)
+end
+
+function sample_bernoulli(bernoulli_sampler::GS, p::Real)
+    probs_cat = [p 1.0 .- p]
+    return sample_gumbel_softmax(
+        probs=probs_cat, tau=bernoulli_sampler.tau, epsilon=1e-8)[1]
+end
+
+function sample_bernoulli(bernoulli_sampler::GS, probs::AbstractVector)
     probs_cat = [probs 1.0 .- probs]
     return sample_gumbel_softmax(
         probs=probs_cat, tau=bernoulli_sampler.tau, epsilon=1e-8)[:, 1]
 end
 
-function sample_bernoulli(bernoulli_sampler::RGS, probs)
+function sample_bernoulli(bernoulli_sampler::RGS, probs::AbstractVector)
     probs_cat = [probs 1.0 .- probs]
     return sample_rao_gumbel_softmax(probs=probs_cat, tau=bernoulli_sampler.tau,
         k=bernoulli_sampler.k, epsilon=1e-8)[:, 1]
 end
 
-# forward diff rule
-function sample_bernoulli(::ST, p)
+function sample_bernoulli(::ST, p::Real)
     return (rand() < p) + (p - ignore_gradient(p))
 end
 

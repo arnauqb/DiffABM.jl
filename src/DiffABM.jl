@@ -39,6 +39,7 @@ include("RandomWalk.jl")
 include("SugarScape.jl")
 include("AxtellFirms/AxtellFirms.jl")
 include("sir_simple.jl")
+include("sir_nonvec.jl")
 #include("sir_simple_vec.jl")
 #include("AxtellFirms/AxtellFirmsVectorized.jl")
 

@@ -5,30 +5,30 @@ using StatsBase
 using Random
 using Flux
 
-export SimpleSIRParams, run_simple_sir
+export SimpleSIRParams, run_simple_sir, SocialDistancing, Quarantine, Policies
 
 # Policy types
-#struct SocialDistancing{T,V}
-#    start_time::Vector{V}
-#    end_time::Vector{V}
-#    alpha::Vector{T}  # reduction in transmission
-#end
-#SocialDistancing() = SocialDistancing(Float64[0.0], Float64[Inf], Float64[1.0])
-#@functor SocialDistancing (start_time, end_time, alpha)
+struct SocialDistancing{T,V}
+    start_time::Vector{V}
+    end_time::Vector{V}
+    alpha::Vector{T}  # reduction in transmission
+end
+SocialDistancing() = SocialDistancing(Float64[0.0], Float64[Inf], Float64[1.0])
+@functor SocialDistancing (start_time, end_time, alpha)
 
-#struct Quarantine{T,V}
-#    start_time::Vector{V}
-#    end_time::Vector{V}
-#    p::Vector{T}  # probability of quarantine
-#end
-#Quarantine() = Quarantine(Float64[0.0], Float64[Inf], Float64[0.0])
-#@functor Quarantine (start_time, end_time, p)
+struct Quarantine{T,V}
+    start_time::Vector{V}
+    end_time::Vector{V}
+    p::Vector{T}  # probability of quarantine
+end
+Quarantine() = Quarantine(Float64[0.0], Float64[Inf], Float64[0.0])
+@functor Quarantine (start_time, end_time, p)
 
-#struct Policies{SD,Q}
-#    social_distancing::SD
-#    quarantine::Q
-#end
-#@functor Policies (social_distancing, quarantine)
+struct Policies{SD,Q}
+    social_distancing::SD
+    quarantine::Q
+end
+@functor Policies (social_distancing, quarantine)
 
 # Helper function for policy activation
 function is_active(time, start_time, end_time)
@@ -38,48 +38,30 @@ function is_active(time, start_time, end_time)
     return hard + (soft - ignore_gradient.(soft))
 end
 
-@stable function does_quarantine(sampler, n_agents, time, quarantine_start_time, quarantine_end_time, quarantine_prob)
-    active = is_active(time, quarantine_start_time, quarantine_end_time)
-    quarantine_probs = ones(n_agents) .* quarantine_prob
+# Policy application functions
+function (p::SocialDistancing)(x, time)
+    mask = is_active(time, p.start_time[1], p.end_time[1])
+    return @. x * (mask * p.alpha[1] + (1.0 - mask))
+end
+
+function (p::Quarantine)(sampler, n_agents, time)
+    active = is_active(time, p.start_time[1], p.end_time[1])
+    quarantine_probs = ones(n_agents) .* p.p[1]
     does_quarantine = sample_bernoulli(sampler, quarantine_probs)
     return does_quarantine .* active
 end
 
-function apply_social_distancing(x, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha)
-    active = is_active(time, social_distancing_start_time, social_distancing_end_time)
-    return x .* (active .* social_distancing_alpha .+ (1.0 .- active))
-end
-
-# Policy application functions
-#function (p::SocialDistancing)(x, time)
-#    mask = is_active(time, p.start_time[1], p.end_time[1])
-#    return @. x * (mask * p.alpha[1] + (1.0 - mask))
-#end
-#
-#function (p::Quarantine)(sampler, n_agents, time)
-#    active = is_active(time, p.start_time[1], p.end_time[1])
-#    quarantine_probs = ones(n_agents) .* p.p[1]
-#    does_quarantine = sample_bernoulli(sampler, quarantine_probs)
-#    return does_quarantine .* active
-#end
-
-
-@kwdef struct SimpleSIRParams{T,S}
+@kwdef struct SimpleSIRParams{T,S,P}
     graph::GNNGraph
     initial_infected::Vector{T}  # probability of initial infection
     beta::Vector{T}             # infection rate
     gamma::Vector{T}            # recovery rate
-    quarantine_start_time::Vector{T}
-    quarantine_end_time::Vector{T}
-    quarantine_prob::Vector{T}
-    social_distancing_start_time::Vector{T}
-    social_distancing_end_time::Vector{T}
-    social_distancing_alpha::Vector{T}
     delta_t::Float64            # time step
     n_timesteps::Int64
     discrete_sampler::S         # for sampling discrete events
+    policies::P                 # policies for intervention
 end
-@functor SimpleSIRParams (initial_infected, beta, gamma, quarantine_start_time, quarantine_end_time, quarantine_prob, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha)
+@functor SimpleSIRParams (initial_infected, beta, gamma, policies)
 
 function initialize(sampler, n_agents, initial_infected, T)
     prob_infected = initial_infected * ones(T, n_agents)
@@ -95,10 +77,10 @@ function is_complete(graph)
 end
 
 function propagate_infection(
-    graph, beta::T, transmission, does_quarantine, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha) where {T}
+    graph, policies, beta::T, transmission, does_quarantine, time) where {T}
     # check if graph is a complete graph
     # Apply social distancing policies
-    beta = apply_social_distancing(beta, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha)
+    beta = policies.social_distancing(beta, time)
     aux = ones(T, length(transmission))
     n_non_quarantined_neighbours = propagate(
         (xi, xj, e) -> xj, graph, +, xj=aux, xi=does_quarantine)
@@ -114,29 +96,21 @@ function propagate_infection(
     return beta .* cumulative_trans ./ n_non_quarantined_neighbours
 end
 
-function propagate_infection(
-    graph, beta::T, transmission, does_quarantine, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha) where {T<:StochasticAD.StochasticTriple}
-    return StochasticAD.propagate(
-        (beta, transmission, does_quarantine, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha)
-         -> propagate_infection(graph, beta, transmission, does_quarantine, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha),
-        beta, transmission, does_quarantine, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha, keep_deltas=Val(true)
-    )
-end
+function compute_transmission(
+    graph, sampler, policies, beta, I, time, delta_t)
 
-function compute_transmission(I::Vector{T}, time, params) where {T}
     # Apply quarantine policies
-    n_agents = nv(params.graph)
-    does_quarantine_result = does_quarantine(
-        params.discrete_sampler, n_agents, time, params.quarantine_start_time[1], params.quarantine_end_time[1], params.quarantine_prob[1])
+    n_agents = nv(graph)
+    does_quarantine = policies.quarantine(sampler, n_agents, time)
 
     # Set transmission to zero for quarantined agents
-    transmission = I .* (one(T) .- does_quarantine_result)
+    transmission = I .* (1.0 .- does_quarantine)
 
     # Compute infection spread
-    transmission = propagate_infection(params.graph, params.beta[1], transmission, does_quarantine_result, time,
-        params.social_distancing_start_time[1], params.social_distancing_end_time[1], params.social_distancing_alpha[1])
-    transmission = @. one(T) - exp(-transmission * params.delta_t)
-    return clamp.(transmission, zero(T), one(T))
+    transmission = propagate_infection(
+        graph, policies, beta, transmission, does_quarantine, time)
+    transmission = @. 1.0 - exp(-transmission * delta_t)
+    return clamp.(transmission, 0.0, 1.0)
 end
 
 function compute_recovery(I, gamma, delta_t)
@@ -144,12 +118,14 @@ function compute_recovery(I, gamma, delta_t)
     return clamp.(recovery, 0.0, 1.0)
 end
 
-function sir_step(S, I, R, time, params)
-    transmission = compute_transmission(I, time, params)
+function sir_step(graph, S, I, R, beta, gamma, time, delta_t,
+    sampler, policies)
+    transmission = compute_transmission(
+        graph, sampler, policies, beta[1], I, time, delta_t)
 
-    delta_I = S .* sample_bernoulli(params.discrete_sampler, transmission)
-    recovery = compute_recovery(I, params.gamma[1], params.delta_t)
-    delta_R = I .* sample_bernoulli(params.discrete_sampler, recovery)
+    delta_I = S .* sample_bernoulli(sampler, transmission)
+    recovery = compute_recovery(I, gamma[1], delta_t)
+    delta_R = I .* sample_bernoulli(sampler, recovery)
 
     S = S - delta_I
     I = I + delta_I - delta_R
@@ -170,7 +146,11 @@ function abm_run(params::SimpleSIRParams)
 
     for i in 2:(params.n_timesteps)
         time = i * params.delta_t
-        x = sir_step(x[1], x[2], x[3], time, params)
+        x = sir_step(
+            params.graph, x[1], x[2], x[3],
+            params.beta, params.gamma, time, params.delta_t,
+            params.discrete_sampler, params.policies)
+
         push!(delta_I_ts, sum(x[4]))
         push!(delta_R_ts, sum(x[5]))
     end
