@@ -98,7 +98,7 @@ function propagate_infection(
     graph, beta::T, transmission, does_quarantine, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha) where {T}
     # check if graph is a complete graph
     # Apply social distancing policies
-    beta = apply_social_distancing(beta, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha[1]
+    beta = apply_social_distancing(beta, time, social_distancing_start_time, social_distancing_end_time, social_distancing_alpha)
     aux = ones(T, length(transmission))
     n_non_quarantined_neighbours = propagate(
         (xi, xj, e) -> xj, graph, +, xj=aux, xi=does_quarantine)
