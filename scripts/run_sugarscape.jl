@@ -13,7 +13,7 @@ animation = pyimport("matplotlib.animation")
 
 ##
 function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds)
-    board_length = 75
+    board_length = 50
     n_agents = 100
     n_timesteps = 100
     board = readdlm("scripts/sugar-map.txt")[:]

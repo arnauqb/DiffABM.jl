@@ -145,21 +145,20 @@ function initialize_agents(initializer::RandomAgentInitializer{T,M,W,U,N,S},
     n_agents, diff_type) where {T,M,W,U,N,S}
     agents = SugarSeeker[]
     # correct numerical error by renormalizing
-    #vision_probs = initializer.vision_distribution_probs
-    #vision_probs = vision_probs ./ sum(vision_probs)
-    #vision_probs = vcat(initializer.vision_distribution_probs, 1.0 - sum(initializer.vision_distribution_probs))
     vision_probs = initializer.vision_distribution_probs
+    #vision_probs = vcat(initializer.vision_distribution_probs, 1.0 - sum(initializer.vision_distribution_probs))
     metabolic_rate_dist = DiffBeta(
         initializer.metabolic_rate_bounds[1], initializer.metabolic_rate_bounds[2])
     wealth_dist = DiffBeta(initializer.wealth_bounds[1], initializer.wealth_bounds[2])
     vision_matrices = generate_vision_matrices(
-        initializer.neighborhood, length(vision_probs))
+        #initializer.neighborhood, length(vision_probs))
+        initializer.neighborhood, 6)[[1, end]]
     for i in 1:n_agents
         vision_onehot_index = rand(DifferentiableOneHotCategorical(
             vision_probs, initializer.discrete_sampler))
         vision_matrix = sum(vision_matrices .* vision_onehot_index)
         metabolic_rate = 2.0 + 2 * rand(metabolic_rate_dist)
-        wealth = 10 * rand(wealth_dist)
+        wealth = 6 + 19 * rand(wealth_dist) 
         position = rand(initializer.position_distribution)
         agent = SugarSeeker(
             id=i,
@@ -276,8 +275,10 @@ function compute_new_wealth(board, agent, move_onehot)
 end
 
 function compute_alive(agent, occupied, smoothing)
-    soft = smoothing(agent.wealth[1])
-    hard = ignore_gradient(agent.wealth[1]) >= 0.0
+    #return agent.alive
+    wealth = agent.wealth[1]
+    soft = smoothing(wealth)
+    hard = ignore_gradient(wealth) >= 0.0
     lives = hard + (soft - ignore_gradient(soft))
     new_alive = agent.alive * lives
     return new_alive

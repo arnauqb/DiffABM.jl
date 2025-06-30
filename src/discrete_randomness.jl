@@ -41,8 +41,8 @@ function sample_bernoulli(::Union{SAD, SM}, p::Real)
     return rand(Distributions.Bernoulli(p))
 end
 
-function sample_bernoulli(::Union{SAD,SM}, probs::AbstractVector)
-    return sample_bernoulli.(Ref(categorical_sampler), probs)
+function sample_bernoulli(sampler::Union{SAD,SM}, probs::AbstractVector)
+    return sample_bernoulli.(Ref(sampler), probs)
 end
 
 function sample_bernoulli(bernoulli_sampler::GS, p::Real)
@@ -129,13 +129,15 @@ function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical
 end
 function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:Union{GS,RGS}}
     probs = reshape(d.probs, 1, :)
+    probs = probs ./ sum(probs)
     return sample_gumbel_softmax(probs=probs, tau=d.rep_method.tau, epsilon=1e-8)[1, :]
 end
 function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:ST}
     probs = d.probs ./ sum(d.probs)
     index = rand(Categorical(ignore_gradient.(probs)))
     index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(probs))
-    return index_onehot_hard + (probs - ignore_gradient.(probs))
+    probs_soft = softmax(probs)
+    return index_onehot_hard + (probs_soft - ignore_gradient.(probs_soft))
 end
 function Distributions.rand!(rng::AbstractRNG, d::DifferentiableOneHotCategorical, x::AbstractArray{<:Real,M}) where {M}
     x .= rand(rng, d)
