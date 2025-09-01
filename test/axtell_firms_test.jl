@@ -10,7 +10,7 @@ using Test
         firm_output = 2.0
         size = 2.0
         @testset "CobbDouglasUtility" begin
-            utility_function = CobbDouglasUtility()
+            utility_function = DiffABM.CobbDouglasUtility()
             @test utility_function(firm_output, size, theta, agent_effort) ==
                   (2.0 / 2.0)^0.5 * (1.0 - 0.5)^(1.0 - 0.5)
         end
@@ -22,7 +22,7 @@ using Test
         end
         @testset "compute_optimal_effort" begin
             # this effort maximies the ulitiy function
-            utility_function = CobbDouglasUtility()
+            utility_function = DiffABM.CobbDouglasUtility()
             E = DiffABM.compute_group_effort_from_output(firm_output, agent_effort, a, b)
             utility_values = []
             for agent_e in 0:0.01:1.0
