@@ -1,12 +1,8 @@
-using BenchmarkTools
 using DiffABM
-using Distributions
-using DistributionsAD
 using Flux
 using Images
 using DelimitedFiles
 using PyPlot
-using Profile, PProf
 using Random
 using PyCall
 animation = pyimport("matplotlib.animation")
@@ -16,10 +12,10 @@ function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_boun
     board_length = 50
     n_agents = 100
     n_timesteps = 100
-    board = readdlm("scripts/sugar-map.txt")[:]
+    board = readdlm("scripts/sugar-map.txt")
     board = Images.imresize(board, (board_length, board_length))[:]
     board_initializer = GeneratedBoard(board_length, board)
-    discrete_sampler = SM()
+    discrete_sampler = ST()
     neighborhood = VonNeumannNeighborhood()
     sugar_regeneration_rate = 1.0
     gradient_horizon = 10000
@@ -29,26 +25,20 @@ function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_boun
         metabolic_rate_bounds = metabolic_rate_bounds,
         wealth_bounds = wealth_bounds,
         neighborhood = neighborhood,
-        discrete_sampler = discrete_sampler)
+        discrete_sampler = discrete_sampler,
+        vision_spacing = 1)
     smoothing = GaussianSmoothing(1.0)
     sugarscape = SugarScapeParams(
         board_initializer, agent_initializer, board_length,
         n_agents, n_timesteps, [sugar_regeneration_rate], gradient_horizon, smoothing)
     return sugarscape
 end
-vision_probs = ones(6) ./ 6 #[0.2, 0.2, 0.2, 0.2, 0.2]
+vision_probs = [0.5, 0.5]
 metabolic_rate_bounds = [2.0, 5.0] # define a beta distribution
 wealth_bounds = [5.0, 2.0] # define a beta distribution
 sugarscape_params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
 # this outputs: board_history, x_history, y_history, wealth_history, alive_history, occupied_history
 # note that these have all the agents!
-##
-function summarizer(x)
-    n_timesteps = length(x[5])
-    n_agents = length(x[5][1])
-    alive_per_timestep = [sum(x[5][t]) / n_agents for t in 1:n_timesteps]
-    return reshape(alive_per_timestep, 1, :)
-end
 
 ##
 params = make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds);
@@ -105,3 +95,31 @@ function run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
     plt.close(fig)
 end
 run_and_animate(vision_probs, metabolic_rate_bounds, wealth_bounds)
+
+
+## compute jacobian
+using ForwardDiff
+
+function summarizer(x)
+    # extracts time-series of alive agents
+    n_timesteps = length(x[5])
+    n_agents = length(x[5][1])
+    wealth_per_timestep = [sum(x[4][t]) / n_agents for t in 1:n_timesteps]
+    return reshape(wealth_per_timestep, 1, :)
+end
+
+
+# flux decompose model
+params_flat, restruct_f = Flux.destructure(params)
+function run_for_p(p)
+    x = abm_run(restruct_f(p))
+    y = summarizer(x)
+    return y
+end
+jacobian = ForwardDiff.jacobian(run_for_p, params_flat)
+
+fig, ax = plt.subplots(1, 6, figsize=(10, 5));
+for i in 1:6
+    ax[i].plot(jacobian[:, i])
+end
+fig

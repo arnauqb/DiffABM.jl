@@ -45,3 +45,20 @@ for ax in axs
     ax.set_xlabel("timestep")
 end
 fig
+
+## jacobian
+
+using ForwardDiff
+
+params_flat, restruct_f = Flux.destructure(abm_params)
+function run_for_p(p)
+    x = abm_run(restruct_f(p))
+    return x[1,:]
+end
+jacobian = ForwardDiff.jacobian(run_for_p, params_flat)
+
+fig, ax = plt.subplots(1, 8, figsize=(10, 5));
+for i in 1:8
+    ax[i].plot(jacobian[:, i])
+end
+fig

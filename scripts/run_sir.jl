@@ -1,64 +1,65 @@
 using DiffABM
+using ForwardDiff
+using Flux
 using PyPlot
 
 ##
-struct ConstantGraph{T}
-    graph::T
-end
-(cg::ConstantGraph)() = cg.graph
 
-function make_sir(;
-        initial_infected,
-        betas,
-        gamma,
-        social_distancing_start_date,
-        social_distancing_end_date,
-        social_distancing_probs,
-        quarantine_start_date,
-        quarantine_end_date,
-        quarantine_prob
-)
-    n_agents = 10000
-    venues = [:venue]
-    graph = generate_complete_graph(n_agents)
-    generator = ConstantGraph(graph)
-    # format: start date, end date, quarantine prob
-    quarantine = Quarantine(
-        [quarantine_start_date], [quarantine_end_date], [quarantine_prob])
-    quarantine_policies = QuarantinePolicies([quarantine])
-    # format: start date, end date, venues, social distancing prob
-    social_distancing = SocialDistancing(
-        [social_distancing_start_date], [social_distancing_end_date],
-        [:venue], social_distancing_probs)
-    social_distancing_policies = SocialDistancingPolicies([social_distancing])
-    policies = Policies(social_distancing_policies, quarantine_policies)
-    initial_infected = [initial_infected]
-    betas = betas # beta per each venue
-    gamma = [gamma]
-    delta_t = 1.0
-    n_timesteps = 60
-    sir_params = SIRParams(generator, initial_infected, betas, venues, gamma, delta_t,
-        n_timesteps, SAD(), ConstantInfection(), policies)
-    return sir_params
-end
-sir_params = make_sir(
-    initial_infected = 0.005,
-    betas = [0.3],
-    gamma = 0.05,
-    social_distancing_start_date = 12.0,
-    social_distancing_end_date = 40.0,
-    social_distancing_probs = [0.5],
-    quarantine_start_date = 20.0,
-    quarantine_end_date = 30.0,
-    quarantine_prob = 0.8
-)
-x = abm_run(sir_params)
+function get_params()
+    n_agents = 10000;
+    delta_t = 1.0;
+    n_timesteps = 60;
+    model_params = (
+        initial_infected = [0.005],
+        beta = [0.4],
+        gamma = [0.05],
+        social_distancing_start_time = [10.0],
+        social_distancing_end_time = [35.0],
+        alpha = [0.4],
+        quarantine_start_time = [15.0],
+        quarantine_end_time = [25.0],
+        p_quarantine = [0.7],
+    );
+    neighbours = [setdiff(rand(1:n_agents, 10), [i]) for i in 1:n_agents];
 
-##
-fig, ax = plt.subplots()
-ax.plot(x[1,:], label = "infected")
-ax.plot(x[2,:], label = "recovered")
-ax.set_ylabel("proportion of population")
-ax.set_xlabel("timestep")
-ax.legend()
+    params = SIRNonVecParams(
+        neighbours = neighbours,
+        model_params = model_params,
+        n_agents = n_agents,
+        delta_t = delta_t,
+        n_timesteps = n_timesteps,
+        discrete_sampler = ST(),
+        use_policies = true
+    )
+    return params
+end
+
+params = get_params()
+x = abm_run(params);
+
+fig, ax = plt.subplots(1, 2, figsize=(10, 5));
+ax[1].plot(x[1, :]);
+ax[2].plot(x[2, :]);
 fig
+
+## Jacobian with respect to parameters
+
+params_flat, restruct_f = Flux.destructure(params)
+function run_for_p(p)
+    return abm_run(restruct_f(p))
+end
+jacobian = ForwardDiff.jacobian(run_for_p, params_flat)
+
+function plot_jacobian(jacobian)
+    fig, ax = plt.subplots(3, 3, figsize=(10, 5));
+    jacobian_idx = 1
+    for i in 1:3
+        for j in 1:3
+            ax[i, j].plot(jacobian[:, jacobian_idx])
+            jacobian_idx += 1
+        end
+    end
+    fig
+end
+
+plot_jacobian(jacobian)
