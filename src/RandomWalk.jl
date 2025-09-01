@@ -19,5 +19,5 @@ function abm_run(params::RandomWalkParams{T}) where {T}
         x_t = abm_step(params, x, t)
         x = vcat(x, x_t)
     end
-    return x
+    return reshape(x, 1, :)
 end
