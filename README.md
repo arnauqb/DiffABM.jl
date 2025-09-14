@@ -184,6 +184,8 @@ ax[2].set_xlabel("Timestep")
 ax[2].set_ylabel("Mean firm output")
 ```
 
+![](./axtell_training.png)
+
 The complete example is available in [`scripts/train_axtell.jl`](scripts/train_axtell.jl).
 
 ## Citation

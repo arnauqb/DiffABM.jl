@@ -7,6 +7,8 @@ using DifferentiationInterface
 using Optimisers
 using Random
 using Distributions
+using Random
+Random.seed!(42)
 
 const DI = DifferentiationInterface
 
@@ -98,7 +100,7 @@ function train_model(y, n_epochs)
 end
 
 # Run the training for 2000 epochs
-loss_history, param_history = train_model(x, 2000);
+loss_history, param_history = train_model(x, 5000);
 loss_history = vcat(loss_history...)  # Convert to flat array
 param_history = hcat(param_history...)  # Convert to matrix (params × epochs)
 
@@ -128,7 +130,9 @@ ax[2].plot(x_initial[3, :], color = "C0", label = "Initial")
 ax[2].plot(x_final[3, :], color = "C1", label = "Final")
 ax[2].plot(x[3, :], color = "black", label = "True")
 ax[2].legend()
+ax[2].set_yscale("log")
 ax[2].set_title("Mean firm output per time-step")
 ax[2].set_xlabel("Timestep")
 ax[2].set_ylabel("Mean firm output")
+fig.savefig("axtell_training.png")
 fig
