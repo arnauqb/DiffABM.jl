@@ -1,5 +1,31 @@
 using Test
+using DelimitedFiles
 using DiffABM
+
+function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds)
+    board_length = 50
+    n_agents = 100
+    n_timesteps = 100
+    board = readdlm("scripts/sugar-map.txt")
+    board_initializer = GeneratedBoard(board_length, board[:])
+    discrete_sampler = ST()
+    neighborhood = VonNeumannNeighborhood()
+    sugar_regeneration_rate = 1.0
+    gradient_horizon = 10000
+    agent_initializer = RandomAgentInitializer(
+        board_length,
+        vision_distribution_probs = vision_probs,
+        metabolic_rate_bounds = metabolic_rate_bounds,
+        wealth_bounds = wealth_bounds,
+        neighborhood = neighborhood,
+        discrete_sampler = discrete_sampler,
+        vision_spacing = 1)
+    smoothing = GaussianSmoothing(1.0)
+    sugarscape = SugarScapeParams(
+        board_initializer, agent_initializer, board_length,
+        n_agents, n_timesteps, [sugar_regeneration_rate], gradient_horizon, smoothing)
+    return sugarscape
+end
 
 @testset "SugarScape" begin
     @testset "generate_vision_matrices" begin
@@ -159,5 +185,18 @@ using DiffABM
         # So we check that one of them has the highest value
         max_idx_tie = findmax(move_onehot_tie)[2]
         @test max_idx_tie == 2 || max_idx_tie == 6  # North (index 2) or East (index 6)
+    end
+    @testset "model jacobian with ForwardDiff" begin
+        n_timesteps = 100
+        params = make_sugarscape_params([0.5, 0.5], [1.0, 2.0], [1.0, 2.0])
+        params_flat, restruct_f = Flux.destructure(params)
+        function run_for_p(p)
+            x = abm_run(restruct_f(p))
+            wealth_per_timestep = [sum(x[4][t]) for t in 1:n_timesteps]
+            return wealth_per_timestep
+        end
+        jacobian = ForwardDiff.jacobian(run_for_p, params_flat)
+        @test size(jacobian) == (100, 6)
+        @test all(isfinite.(jacobian))
     end
 end

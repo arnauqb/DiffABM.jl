@@ -1,4 +1,6 @@
 using DiffABM
+using ForwardDiff
+using Flux
 using Test
 
 @testset "AxtellFirms" begin
@@ -37,5 +39,21 @@ using Test
         @testset "compute_firms_output" begin
             @test DiffABM.compute_firms_output(10, a, b) == a * 10 + b * 10^2
         end
+    end
+    @testset "model jacobian with ForwardDiff" begin
+        # Create a small model instance
+        n_agents = 5
+        initializer = DiffABM.RandomAxtellAgentInitializer(
+            n_agents, [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], 2)
+        params = DiffABM.AxtellFirmsParams(initializer, 0.1, 1.0, 3, 2)
+
+        params_flat, restruct_f = Flux.destructure(params)
+        function run_for_p(p)
+            x = abm_run(restruct_f(p))
+            return x[1,:]
+        end
+        jacobian = ForwardDiff.jacobian(run_for_p, params_flat)
+        @test size(jacobian) == (3, 8)
+        @test all(isfinite.(jacobian))
     end
 end

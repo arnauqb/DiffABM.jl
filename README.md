@@ -1,7 +1,7 @@
 # DiffABM.jl: Differentiable Agent-Based Models in Julia
 
-!!! warning
-    This is still very much an experimenting package
+> [!CAUTION]
+> This is still very much an experimenting package
 
 This package includes differentiable implementations of 3 popular agent-based models:
 
@@ -9,7 +9,7 @@ This package includes differentiable implementations of 3 popular agent-based mo
 2. Sugarscape
 3. Network-based SIR model
 
-# Installation
+## Installation
 
 To install the package locally, simply run
 
@@ -21,4 +21,25 @@ julia --project
 ]instantiate
 ```
 
+## Examples
+
 You can find examples on how to run and differentiate each model in the `scripts` folder.
+
+## TODO
+
+
+## Citation
+
+Please consider citing this work 
+
+```bibtex
+@misc{querabofarull2025automaticdifferentiationagentbasedmodels,
+      title={Automatic Differentiation of Agent-Based Models}, 
+      author={Arnau Quera-Bofarull and Nicholas Bishop and Joel Dyer and Daniel Jarne Ornia and Anisoara Calinescu and Doyne Farmer and Michael Wooldridge},
+      year={2025},
+      eprint={2509.03303},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2509.03303}, 
+}
+```

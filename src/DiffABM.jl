@@ -12,11 +12,9 @@ using Flux
 using GraphNeuralNetworks
 using GumbelSoftmax
 using LinearAlgebra
-using OffsetArrays
 using Random
 using SpecialFunctions
 using StatsBase
-using StaticArrays
 using StochasticAD
 
 export abm_step, abm_run
@@ -31,10 +29,9 @@ include("diff_utils.jl")
 include("discrete_randomness.jl")
 
 # models
-include("BrockHommes.jl")
-include("RandomWalk.jl")
-include("SugarScape.jl")
-include("AxtellFirms.jl")
-include("SIR.jl")
+include("random_walk.jl")
+include("sugar_scape.jl")
+include("axtell_firms.jl")
+include("sir.jl")
 
 end
