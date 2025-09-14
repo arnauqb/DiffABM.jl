@@ -32,10 +32,9 @@ include("discrete_randomness.jl")
 
 # models
 include("BrockHommes.jl")
-include("GameOfLife.jl")
 include("RandomWalk.jl")
 include("SugarScape.jl")
-include("AxtellFirms/AxtellFirms.jl")
-include("sir_nonvec.jl")
+include("AxtellFirms.jl")
+include("SIR.jl")
 
 end

@@ -111,6 +111,7 @@ struct DifferentiableOneHotCategorical{T,R} <: Distributions.DiscreteMultivariat
 end
 Base.length(d::DifferentiableOneHotCategorical) = length(d.probs)
 function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:Union{SM}}
+    # NOTE: not clear if this works
     probs = d.probs ./ sum(d.probs)
     index = rand(Categorical(probs))
     index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(d.probs))
@@ -122,6 +123,7 @@ function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical
     return index_onehot
 end
 function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical{T,R}) where {T,R<:SAD}
+    # NOTE: not clear if this works
     probs = d.probs ./ sum(d.probs)
     index = rand(Categorical(probs))
     onehot_matrix = Diagonal(ones(length(d.probs)))
@@ -136,8 +138,7 @@ function Distributions.rand(rng::AbstractRNG, d::DifferentiableOneHotCategorical
     probs = d.probs ./ sum(d.probs)
     index = rand(Categorical(ignore_gradient.(probs)))
     index_onehot_hard = Flux.onehot(ignore_gradient(index), 1:length(probs))
-    probs_soft = softmax(probs)
-    return index_onehot_hard + (probs_soft - ignore_gradient.(probs_soft))
+    return index_onehot_hard + (probs - ignore_gradient.(probs))
 end
 function Distributions.rand!(rng::AbstractRNG, d::DifferentiableOneHotCategorical, x::AbstractArray{<:Real,M}) where {M}
     x .= rand(rng, d)

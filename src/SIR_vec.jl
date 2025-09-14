@@ -84,9 +84,6 @@ function propagate_infection(
     n_non_quarantined_neighbours = propagate(
         (xi, xj, e) -> xj, graph, +, xj=ones_aux, xi=does_quarantine)
     n_non_quarantined_neighbours = max.(one(T), n_non_quarantined_neighbours)
-    #if is_complete(graph)
-    #    return beta * sum(transmission) ./ n_non_quarantined_neighbours
-    #end
     # Simple message passing between agents
     cumulative_trans = propagate(
         (xi, xj, e) -> xi .* xj, graph, +, xi=ones_aux, xj=transmission)
