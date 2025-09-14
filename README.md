@@ -44,7 +44,7 @@ using Distributions
 const DI = DifferentiationInterface
 ```
 
-We use `DifferentiationInterface.jl` for automatic differentiation, `Flux.jl` for parameter handling, and `Optimisers.jl` for the Adam optimizer.
+We use `DifferentiationInterface.jl` to compute gradients through `ForwardDiff.jl`, `Flux.jl` for parameter handling, and `Optimisers.jl` for the Adam optimizer.
 
 #### 2. Model Configuration
 
