@@ -1,4 +1,5 @@
 using DiffABM
+using Flux
 using Test
 
 function create_test_model_params(;
