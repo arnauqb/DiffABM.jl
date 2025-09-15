@@ -1,7 +1,7 @@
 # DiffABM.jl: Differentiable Agent-Based Models in Julia
 
 > [!CAUTION]
-> This is still very much an experimenting package
+> This is still very much an experimental package
 
 This package includes differentiable implementations of 3 popular agent-based models:
 
