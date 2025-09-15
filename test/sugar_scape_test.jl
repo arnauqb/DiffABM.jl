@@ -1,12 +1,16 @@
 using Test
+using Flux
+using ForwardDiff
 using DelimitedFiles
 using DiffABM
+
+THIS_FILE_DIR = @__DIR__
 
 function make_sugarscape_params(vision_probs, metabolic_rate_bounds, wealth_bounds)
     board_length = 50
     n_agents = 100
     n_timesteps = 100
-    board = readdlm("scripts/sugar-map.txt")
+    board = readdlm(joinpath(THIS_FILE_DIR, "sugar-map.txt"))
     board_initializer = GeneratedBoard(board_length, board[:])
     discrete_sampler = ST()
     neighborhood = VonNeumannNeighborhood()
